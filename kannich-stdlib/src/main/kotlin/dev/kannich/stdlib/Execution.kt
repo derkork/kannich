@@ -22,9 +22,10 @@ class ExecutionBuilder(private val name: String) {
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, block: JobBuilder.() -> Unit) {
-        val job = JobBuilder(name).apply(block).build()
-        steps.add(JobExecutionStep(job))
+    fun job(name: String, block: JobScope.() -> Unit) {
+        val builder = JobBuilder(name)
+        builder.setBlock(block)
+        steps.add(JobExecutionStep(builder.build()))
     }
 
     fun execution(execution: Execution) {
@@ -49,6 +50,12 @@ class SequentialBuilder {
         steps.add(JobExecutionStep(job))
     }
 
+    fun job(name: String, block: JobScope.() -> Unit) {
+        val builder = JobBuilder(name)
+        builder.setBlock(block)
+        steps.add(JobExecutionStep(builder.build()))
+    }
+
     fun parallel(block: ParallelBuilder.() -> Unit) {
         steps.add(ParallelBuilder().apply(block).build())
     }
@@ -61,6 +68,12 @@ class ParallelBuilder {
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
+    }
+
+    fun job(name: String, block: JobScope.() -> Unit) {
+        val builder = JobBuilder(name)
+        builder.setBlock(block)
+        steps.add(JobExecutionStep(builder.build()))
     }
 
     internal fun build(): ParallelSteps = ParallelSteps(steps.toList())

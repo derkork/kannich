@@ -28,8 +28,10 @@ pipeline {
     }
 
     execution("fail") {
-        job("fail-job") {
-            fail("This is designed to fail.")
+        sequentially {
+            job("fail-job") {
+                fail("This is designed to fail.")
+            }
         }
     }
 
