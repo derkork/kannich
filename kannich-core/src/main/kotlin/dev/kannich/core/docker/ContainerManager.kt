@@ -103,7 +103,12 @@ class ContainerManager(
     ): ExecResult {
         checkInitialized()
 
-        logger.debug("Executing: ${command.joinToString(" ")}")
+        if (!silent) {
+            logger.info("Executing: ${command.joinToString(" ")}")
+        }
+        else {
+            logger.debug("Executing: ${command.joinToString(" ")}")
+        }
         return client.execInContainer(
             containerId!!,
             command,

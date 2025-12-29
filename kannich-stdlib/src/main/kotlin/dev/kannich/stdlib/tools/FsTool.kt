@@ -1,0 +1,150 @@
+﻿package dev.kannich.stdlib.tools
+
+import dev.kannich.stdlib.fail
+
+/**
+ * Built-in tool for filesystem operations.
+ * Provides a clean API for common file/directory operations.
+ *
+ * Some operations support shell glob patterns (*, ?, [...]) in source paths.
+ * Whitespace and shell metacharacters are automatically escaped while preserving globs.
+ */
+class FsTool {
+    private val shell = ShellTool()
+
+    /**
+     * Escapes shell metacharacters while preserving glob patterns (*, ?, [...]).
+     * This allows paths with spaces to work while still supporting glob expansion.
+     */
+    private fun escapeForGlob(path: String): String {
+        val sb = StringBuilder()
+        var i = 0
+        while (i < path.length) {
+            val c = path[i]
+            when (c) {
+                // Preserve glob characters
+                '*', '?' -> sb.append(c)
+                '[' -> {
+                    // Preserve bracket expressions [...]
+                    val closeBracket = path.indexOf(']', i + 1)
+                    if (closeBracket != -1) {
+                        sb.append(path.substring(i, closeBracket + 1))
+                        i = closeBracket
+                    } else {
+                        sb.append("\\[")
+                    }
+                }
+                // Escape shell metacharacters
+                ' ', '\t', '\n', '(', ')', '<', '>', '&', ';', '|',
+                '$', '`', '\\', '"', '\'', '!', '{', '}', '#' -> {
+                    sb.append('\\')
+                    sb.append(c)
+                }
+                else -> sb.append(c)
+            }
+            i++
+        }
+        return sb.toString()
+    }
+
+    /**
+     * Creates a temporary directory and returns its path.
+     *
+     * @param prefix Optional prefix for the temp directory name
+     * @return The path to the created temporary directory
+     * @throws dev.kannich.stdlib.JobFailedException if creation fails
+     */
+    fun mktemp(prefix: String = "kannich"): String {
+        val result = shell.execShell("mktemp -d -t '$prefix.XXXXXX'")
+        if (!result.success) {
+            fail("Failed to create temp directory: ${result.stderr}")
+        }
+        return result.stdout.trim()
+    }
+
+    /**
+     * Creates a directory and all parent directories if they don't exist.
+     *
+     * @param path The directory path to create
+     * @throws dev.kannich.stdlib.JobFailedException if creation fails
+     */
+    fun mkdir(path: String) {
+        val result = shell.execShell("mkdir -p '$path'")
+        if (!result.success) {
+            fail("Failed to create directory $path: ${result.stderr}")
+        }
+    }
+
+    /**
+     * Copies files or directories to a destination.
+     *
+     * @param src The source path (supports glob patterns like *.txt, /path/files-*)
+     * @param dest The destination path (no glob support, receives the files)
+     * @param recursive Whether to copy directories recursively (default: true)
+     * @throws dev.kannich.stdlib.JobFailedException if copy fails
+     */
+    fun copy(src: String, dest: String, recursive: Boolean = true) {
+        val flags = if (recursive) "-r" else ""
+        val result = shell.execShell("cp $flags ${escapeForGlob(src)} '$dest'")
+        if (!result.success) {
+            fail("Failed to copy $src to $dest: ${result.stderr}")
+        }
+    }
+
+    /**
+     * Moves files or directories to a destination.
+     *
+     * @param src The source path (supports glob patterns like *.txt, /path/files-*)
+     * @param dest The destination path (no glob support, receives the files)
+     * @throws dev.kannich.stdlib.JobFailedException if move fails
+     */
+    fun move(src: String, dest: String) {
+        val result = shell.execShell("mv ${escapeForGlob(src)} '$dest'")
+        if (!result.success) {
+            fail("Failed to move $src to $dest: ${result.stderr}")
+        }
+    }
+
+    /**
+     * Deletes files or directories recursively.
+     *
+     * @param path The path to delete (supports glob patterns like *.txt, /path/files-*)
+     * @throws dev.kannich.stdlib.JobFailedException if deletion fails
+     */
+    fun delete(path: String) {
+        val result = shell.execShell("rm -rf ${escapeForGlob(path)}")
+        if (!result.success) {
+            fail("Failed to delete $path: ${result.stderr}")
+        }
+    }
+
+    /**
+     * Checks if a path exists.
+     *
+     * @param path The exact path to check (no glob support)
+     * @return true if the path exists
+     */
+    fun exists(path: String): Boolean {
+        return shell.execShell("test -e '$path'").success
+    }
+
+    /**
+     * Checks if a path is a directory.
+     *
+     * @param path The exact path to check (no glob support)
+     * @return true if the path is a directory
+     */
+    fun isDirectory(path: String): Boolean {
+        return shell.execShell("test -d '$path'").success
+    }
+
+    /**
+     * Checks if a path is a file.
+     *
+     * @param path The exact path to check (no glob support)
+     * @return true if the path is a file
+     */
+    fun isFile(path: String): Boolean {
+        return shell.execShell("test -f '$path'").success
+    }
+}

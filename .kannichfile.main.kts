@@ -16,15 +16,15 @@ pipeline {
     val maven = Maven("3.9.6", java)
 
     val compile = job("Compile") {
-        maven.exec("compile")
+        maven.exec("-B", "compile")
     }
 
     val test = job("Test", { include("**/target/surefire-reports/**") }) {
-        maven.exec("test")
+        maven.exec("-B", "test")
     }
 
-    val packageJar = job("Package", { include("kannich-cli/target/kannich-cli-*.jar") }) {
-        maven.exec("package", "-DskipTests")
+    val packageJar = job("Package", { include("**/target/**/*.jar") }) {
+        maven.exec("-B", "package", "-DskipTests")
     }
 
     execution("fail") {

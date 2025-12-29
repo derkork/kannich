@@ -2,8 +2,8 @@ package dev.kannich.maven
 
 import dev.kannich.jvm.Java
 import dev.kannich.stdlib.BaseTool
-import dev.kannich.stdlib.CacheTool
-import dev.kannich.stdlib.ExtractTool
+import dev.kannich.stdlib.tools.CacheTool
+import dev.kannich.stdlib.tools.ExtractTool
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.context.JobExecutionContext
 import org.slf4j.Logger
