@@ -3,6 +3,8 @@ package dev.kannich.jvm
 import dev.kannich.stdlib.BaseTool
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.context.JobExecutionContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 /**
  * Provides Java SDK management for Kannich pipelines.
@@ -19,7 +21,7 @@ import dev.kannich.stdlib.context.JobExecutionContext
  * ```
  */
 class Java(version: String) : BaseTool(version) {
-
+    val logger: Logger = LoggerFactory.getLogger(Java::class.java)
     /**
      * Gets the Java home directory path inside the container.
      * The path is computed based on the context's cache directory.
@@ -34,27 +36,40 @@ class Java(version: String) : BaseTool(version) {
     override fun ensureInstalled(ctx: JobExecutionContext) {
         val homeDir = home(ctx)
         if (isInstalled(ctx, homeDir)) {
+            logger.debug("Java $version is already installed.")
             return
         }
 
+        logger.info("Java $version is not installed, downloading.")
         val cacheDir = ctx.pipelineContext.cacheDir
         val javaDir = "$cacheDir/java"
 
         // Create java directory if needed
-        ctx.executor.exec(listOf("mkdir", "-p", javaDir), ctx.workingDir, emptyMap())
+        val mkdirResult = ctx.executor.exec(listOf("mkdir", "-p", javaDir), ctx.workingDir, emptyMap())
+        if (!mkdirResult.success) {
+            throw RuntimeException("Failed to create cache directory $javaDir: ${mkdirResult.stderr}")
+        }
 
         // Download and extract Java
         // Using Eclipse Temurin (Adoptium) for reliable downloads
+        // Adoptium extracts to directories like "jdk-21.0.5+11", we rename to "temurin-$version"
         val downloadUrl = getDownloadUrl(version)
-        val extractCmd = """
-            curl -sL "$downloadUrl" | tar xzf - -C "$javaDir" &&
-            mv "$javaDir"/temurin-*-jdk-* "$homeDir" 2>/dev/null || true
-        """.trimIndent().replace("\n", " ")
+        val extractCmd = "curl -sL \"$downloadUrl\" | tar xzf - -C \"$javaDir\""
 
-        val result = ctx.executor.exec(listOf("sh", "-c", extractCmd), ctx.workingDir, emptyMap())
-        if (!result.success) {
-            throw RuntimeException("Failed to download Java $version: ${result.stderr}")
+        val extractResult = ctx.executor.exec(listOf("sh", "-c", extractCmd), ctx.workingDir, emptyMap())
+        if (!extractResult.success) {
+            throw RuntimeException("Failed to download/extract Java $version: ${extractResult.stderr}")
         }
+
+        // Find and rename the extracted directory (Adoptium uses "jdk-VERSION+BUILD" naming)
+        val renameCmd = "mv \"$javaDir\"/jdk-${version}* \"$homeDir\""
+        val renameResult = ctx.executor.exec(listOf("sh", "-c", renameCmd), ctx.workingDir, emptyMap())
+        if (!renameResult.success) {
+            throw RuntimeException("Failed to rename Java directory: ${renameResult.stderr}. " +
+                "Expected jdk-${version}* in $javaDir")
+        }
+
+        logger.info("Successfully installed Java $version.")
     }
 
     override fun doExec(ctx: JobExecutionContext, vararg args: String): ExecResult {

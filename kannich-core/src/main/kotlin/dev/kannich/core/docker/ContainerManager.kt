@@ -41,6 +41,48 @@ class ContainerManager(
         client.startContainer(containerId!!)
         isStarted = true
         logger.info("Build container ready: ${containerId?.take(12)}")
+
+        // Verify mounts are accessible
+        verifyMounts()
+    }
+
+    /**
+     * Verifies that required volume mounts are accessible.
+     * Throws an exception if mounts are not working correctly.
+     */
+    private fun verifyMounts() {
+        // Verify project directory is mounted and accessible
+        val projectCheck = exec(listOf("test", "-d", containerProjectDir), silent = true)
+        if (!projectCheck.success) {
+            throw IllegalStateException(
+                "Project directory mount failed: $containerProjectDir is not accessible in container. " +
+                "Host path: ${hostProjectPath ?: projectDir.absolutePath}"
+            )
+        }
+
+        // Verify cache directory is mounted and writable
+        val cacheCheck = exec(listOf("test", "-d", containerCacheDir), silent = true)
+        if (!cacheCheck.success) {
+            throw IllegalStateException(
+                "Cache directory mount failed: $containerCacheDir is not accessible in container. " +
+                "Host path: ${hostCachePath ?: cacheDir.absolutePath}. " +
+                "Ensure the cache directory exists on the host before starting."
+            )
+        }
+
+        // Verify cache is writable by creating a test file
+        val writeCheck = execShell(
+            "touch $containerCacheDir/.kannich-mount-test && rm $containerCacheDir/.kannich-mount-test",
+            silent = true
+        )
+        if (!writeCheck.success) {
+            throw IllegalStateException(
+                "Cache directory is not writable: $containerCacheDir. " +
+                "Check permissions on host path: ${hostCachePath ?: cacheDir.absolutePath}"
+            )
+        }
+
+        logger.debug("Volume mounts verified successfully")
     }
 
     /**

@@ -120,6 +120,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
 
     private fun configureLogging() {
         val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+        val kannichLogger = LoggerFactory.getLogger("dev.kannich") as Logger
 
         // Configure verbose mode on our custom appender
         val appender: Appender<ILoggingEvent>? = rootLogger.getAppender("COLORED")
@@ -130,6 +131,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // Set log level based on verbose flag
         if (verbose) {
             rootLogger.level = Level.DEBUG
+            kannichLogger.level = Level.DEBUG
         }
     }
 }

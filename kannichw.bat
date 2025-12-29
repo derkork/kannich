@@ -27,8 +27,21 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Ensure cache directory exists
-if not exist "%KANNICH_CACHE_DIR%" mkdir "%KANNICH_CACHE_DIR%"
+REM Ensure cache directory exists on host (required for Docker mount)
+if not exist "%KANNICH_CACHE_DIR%" (
+    echo Creating cache directory: %KANNICH_CACHE_DIR%
+    mkdir "%KANNICH_CACHE_DIR%"
+    if errorlevel 1 (
+        echo Error: Failed to create cache directory: %KANNICH_CACHE_DIR%
+        exit /b 1
+    )
+)
+
+REM Verify cache directory is accessible
+if not exist "%KANNICH_CACHE_DIR%\" (
+    echo Error: Cache directory not accessible: %KANNICH_CACHE_DIR%
+    exit /b 1
+)
 
 REM Pull image if not present
 docker image inspect %KANNICH_IMAGE% >nul 2>&1
