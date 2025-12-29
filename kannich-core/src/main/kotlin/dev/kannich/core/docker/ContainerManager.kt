@@ -1,6 +1,7 @@
 package dev.kannich.core.docker
 
 import org.slf4j.LoggerFactory
+import dev.kannich.stdlib.context.ExecResult
 import java.io.Closeable
 import java.io.File
 

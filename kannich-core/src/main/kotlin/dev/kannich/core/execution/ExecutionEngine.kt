@@ -2,7 +2,6 @@ package dev.kannich.core.execution
 
 import dev.kannich.core.docker.ContainerManager
 import dev.kannich.stdlib.ArtifactSpec
-import dev.kannich.stdlib.Execution
 import dev.kannich.stdlib.ExecutionReference
 import dev.kannich.stdlib.ExecutionStep
 import dev.kannich.stdlib.Job
@@ -158,7 +157,7 @@ class ExecutionEngine(
         )
         val executor = ContainerCommandExecutor(containerManager, workDir)
         val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)
-        val jobScope = JobScope(jobCtx)
+        val jobScope = JobScope()
 
         // Execute job block with context
         var success = true
