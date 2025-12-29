@@ -58,7 +58,7 @@ class FsTool {
     fun mktemp(prefix: String = "kannich"): String {
         val result = shell.execShell("mktemp -d -t '$prefix.XXXXXX'")
         if (!result.success) {
-            throw JobFailedException("Failed to create temp directory: ${result.stderr}")
+            fail("Failed to create temp directory: ${result.stderr}")
         }
         return result.stdout.trim()
     }
@@ -72,7 +72,7 @@ class FsTool {
     fun mkdir(path: String) {
         val result = shell.execShell("mkdir -p '$path'")
         if (!result.success) {
-            throw JobFailedException("Failed to create directory $path: ${result.stderr}")
+            fail("Failed to create directory $path: ${result.stderr}")
         }
     }
 
@@ -88,7 +88,7 @@ class FsTool {
         val flags = if (recursive) "-r" else ""
         val result = shell.execShell("cp $flags ${escapeForGlob(src)} '$dest'")
         if (!result.success) {
-            throw JobFailedException("Failed to copy $src to $dest: ${result.stderr}")
+            fail("Failed to copy $src to $dest: ${result.stderr}")
         }
     }
 
@@ -102,7 +102,7 @@ class FsTool {
     fun move(src: String, dest: String) {
         val result = shell.execShell("mv ${escapeForGlob(src)} '$dest'")
         if (!result.success) {
-            throw JobFailedException("Failed to move $src to $dest: ${result.stderr}")
+            fail("Failed to move $src to $dest: ${result.stderr}")
         }
     }
 
@@ -115,7 +115,7 @@ class FsTool {
     fun delete(path: String) {
         val result = shell.execShell("rm -rf ${escapeForGlob(path)}")
         if (!result.success) {
-            throw JobFailedException("Failed to delete $path: ${result.stderr}")
+            fail("Failed to delete $path: ${result.stderr}")
         }
     }
 
@@ -182,7 +182,7 @@ class DownloadTool {
         val result = shell.exec("curl", "-sSLf", "-o", outputPath, url)
         if (!result.success) {
             fs.delete(tempDir)
-            throw JobFailedException("Failed to download $url: ${result.stderr}")
+            fail("Failed to download $url: ${result.stderr}")
         }
 
         return outputPath
@@ -216,7 +216,7 @@ class DownloadTool {
         // Download with curl
         val result = shell.exec("curl", "-sSLf", "-o", outputPath, url)
         if (!result.success) {
-            throw JobFailedException("Failed to download $url: ${result.stderr}")
+            fail("Failed to download $url: ${result.stderr}")
         }
 
         return outputPath
@@ -230,6 +230,22 @@ class DownloadTool {
 class ExtractTool {
     private val fs = FsTool()
     private val shell = ShellTool()
+
+    private enum class ArchiveFormat(val extensions: List<String>, val tarFlag: String?) {
+        TAR_GZ(listOf(".tar.gz", ".tgz"), "z"),
+        TAR_XZ(listOf(".tar.xz", ".txz"), "J"),
+        TAR_BZ2(listOf(".tar.bz2", ".tbz2"), "j"),
+        TAR(listOf(".tar"), ""),
+        ZIP(listOf(".zip"), null),
+        GZ(listOf(".gz"), null);
+
+        companion object {
+            fun detect(path: String): ArchiveFormat? {
+                val lower = path.lowercase()
+                return entries.find { format -> format.extensions.any { lower.endsWith(it) } }
+            }
+        }
+    }
 
     /**
      * Extracts an archive to the specified destination.
@@ -248,31 +264,19 @@ class ExtractTool {
      * @throws JobFailedException if extraction fails or format is unsupported
      */
     fun extract(archive: String, dest: String) {
-        // Ensure destination directory exists
         fs.mkdir(dest)
 
-        // Determine extraction command based on extension
-        val lowerArchive = archive.lowercase()
-        val result = when {
-            lowerArchive.endsWith(".tar.gz") || lowerArchive.endsWith(".tgz") ->
-                shell.exec("tar", "xzf", archive, "-C", dest)
-            lowerArchive.endsWith(".tar.xz") || lowerArchive.endsWith(".txz") ->
-                shell.exec("tar", "xJf", archive, "-C", dest)
-            lowerArchive.endsWith(".tar.bz2") || lowerArchive.endsWith(".tbz2") ->
-                shell.exec("tar", "xjf", archive, "-C", dest)
-            lowerArchive.endsWith(".tar") ->
-                shell.exec("tar", "xf", archive, "-C", dest)
-            lowerArchive.endsWith(".zip") ->
-                shell.exec("unzip", "-q", "-o", archive, "-d", dest)
-            lowerArchive.endsWith(".gz") ->
-                // For .gz files (non-tar), gunzip in place - copy first to dest
-                shell.execShell("cp '$archive' '$dest/' && gunzip -f '$dest/${archive.substringAfterLast('/')}'")
-            else ->
-                throw JobFailedException("Unsupported archive format: $archive")
+        val format = ArchiveFormat.detect(archive)
+            ?: fail("Unsupported archive format: $archive")
+
+        val result = when (format) {
+            ArchiveFormat.ZIP -> shell.exec("unzip", "-q", "-o", archive, "-d", dest)
+            ArchiveFormat.GZ -> shell.execShell("cp '$archive' '$dest/' && gunzip -f '$dest/${archive.substringAfterLast('/')}'")
+            else -> shell.exec("tar", "x${format.tarFlag}f", archive, "-C", dest)
         }
 
         if (!result.success) {
-            throw JobFailedException("Failed to extract $archive: ${result.stderr}")
+            fail("Failed to extract $archive: ${result.stderr}")
         }
     }
 
@@ -286,49 +290,35 @@ class ExtractTool {
      * @throws JobFailedException if download or extraction fails
      */
     fun downloadAndExtract(url: String, dest: String, format: String? = null) {
-        // Ensure destination directory exists
         fs.mkdir(dest)
 
-        // Determine format from URL if not provided
-        val detectedFormat = format ?: detectFormat(url)
+        val archiveFormat = if (format != null) {
+            ArchiveFormat.entries.find { it.extensions.any { ext -> ext.endsWith(format) } }
+                ?: fail("Unsupported archive format: $format")
+        } else {
+            ArchiveFormat.detect(url) ?: ArchiveFormat.TAR_GZ // default for URLs without extensions
+        }
 
-        // Build piped command for efficiency
-        val extractCmd = when (detectedFormat) {
-            "tar.gz", "tgz" -> "tar xzf - -C '$dest'"
-            "tar.xz", "txz" -> "tar xJf - -C '$dest'"
-            "tar.bz2", "tbz2" -> "tar xjf - -C '$dest'"
-            "tar" -> "tar xf - -C '$dest'"
-            "zip" -> {
-                // zip doesn't support piping, need to download first
+        val result = when (archiveFormat) {
+            ArchiveFormat.ZIP, ArchiveFormat.GZ -> {
+                // zip and gz don't support piping, need to download first
                 val tempDir = fs.mktemp("extract")
-                val tempFile = "$tempDir/archive.zip"
-                val result = shell.execShell("curl -sSLf -o '$tempFile' '$url' && unzip -q -o '$tempFile' -d '$dest'")
-                fs.delete(tempDir)
-                if (!result.success) {
-                    throw JobFailedException("Failed to download and extract $url: ${result.stderr}")
+                val ext = archiveFormat.extensions.first()
+                val tempFile = "$tempDir/archive$ext"
+                val extractResult = shell.execShell("curl -sSLf -o '$tempFile' '$url'")
+                if (!extractResult.success) {
+                    fs.delete(tempDir)
+                    fail("Failed to download $url: ${extractResult.stderr}")
                 }
+                extract(tempFile, dest)
+                fs.delete(tempDir)
                 return
             }
-            else -> throw JobFailedException("Unsupported archive format: $detectedFormat")
+            else -> shell.execShell("curl -sSLf '$url' | tar x${archiveFormat.tarFlag}f - -C '$dest'")
         }
 
-        val result = shell.execShell("curl -sSLf '$url' | $extractCmd")
         if (!result.success) {
-            throw JobFailedException("Failed to download and extract $url: ${result.stderr}")
-        }
-    }
-
-    private fun detectFormat(url: String): String {
-        val lowerUrl = url.lowercase()
-        return when {
-            lowerUrl.endsWith(".tar.gz") || lowerUrl.endsWith(".tgz") -> "tar.gz"
-            lowerUrl.endsWith(".tar.xz") || lowerUrl.endsWith(".txz") -> "tar.xz"
-            lowerUrl.endsWith(".tar.bz2") || lowerUrl.endsWith(".tbz2") -> "tar.bz2"
-            lowerUrl.endsWith(".tar") -> "tar"
-            lowerUrl.endsWith(".zip") -> "zip"
-            lowerUrl.endsWith(".gz") -> "gz"
-            // Some URLs don't have extensions (like Adoptium API), assume tar.gz
-            else -> "tar.gz"
+            fail("Failed to download and extract $url: ${result.stderr}")
         }
     }
 }
@@ -401,7 +391,7 @@ class CacheTool {
             // Clear all contents but keep the cache directory itself
             val result = shell.execShell("rm -rf ${baseDir()}/*")
             if (!result.success) {
-                throw JobFailedException("Failed to clear cache: ${result.stderr}")
+                fail("Failed to clear cache: ${result.stderr}")
             }
         }
     }

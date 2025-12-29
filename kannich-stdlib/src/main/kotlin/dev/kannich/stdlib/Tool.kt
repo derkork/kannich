@@ -9,6 +9,16 @@ import dev.kannich.stdlib.context.JobExecutionContext
 class JobFailedException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
+ * Throws a JobFailedException with the given message.
+ *
+ * @param message The error message
+ * @throws JobFailedException always
+ */
+fun fail(message: String): Nothing {
+    throw JobFailedException(message)
+}
+
+/**
  * Interface for tools that can be installed and executed in jobs.
  * Examples: Java SDK, Maven, Gradle, etc.
  */
@@ -60,7 +70,7 @@ abstract class BaseTool(override val version: String) : Tool {
             } else {
                 "Exit code: ${result.exitCode}"
             }
-            throw JobFailedException("Command failed: $errorMessage")
+            fail("Command failed: $errorMessage")
         }
     }
 

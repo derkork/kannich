@@ -27,6 +27,12 @@ pipeline {
         maven.exec("package", "-DskipTests")
     }
 
+    execution("fail") {
+        job("fail-job") {
+            fail("This is designed to fail.")
+        }
+    }
+
     execution("build") {
         sequentially {
             job(compile)
