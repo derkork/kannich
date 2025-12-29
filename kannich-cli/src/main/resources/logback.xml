@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="COLORED" class="dev.kannich.cli.ColoredConsoleAppender">
+        <verbose>false</verbose>
+    </appender>
+
+    <!-- Suppress noisy libraries by default -->
+    <logger name="org.apache.hc" level="WARN"/>
+    <logger name="org.apache.http" level="WARN"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+
+    <!-- Kannich loggers default to INFO -->
+    <logger name="dev.kannich" level="INFO"/>
+
+    <!-- Root logger defaults to WARN -->
+    <root level="WARN">
+        <appender-ref ref="COLORED"/>
+    </root>
+</configuration>

@@ -1,0 +1,51 @@
+package dev.kannich.cli
+
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.AppenderBase
+import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.terminal.Terminal
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+/**
+ * Custom Logback appender that outputs colored text using Mordant.
+ * - ERROR level: light red
+ * - WARN level: yellow
+ * - INFO/DEBUG/TRACE: default color
+ *
+ * Pattern is controlled by the 'verbose' property:
+ * - Normal: HH:mm:ss message
+ * - Verbose: HH:mm:ss [ClassName] message
+ */
+class ColoredConsoleAppender : AppenderBase<ILoggingEvent>() {
+
+    private val terminal = Terminal()
+    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
+
+    var verbose: Boolean = false
+
+    override fun append(event: ILoggingEvent) {
+        val time = timeFormatter.format(Instant.ofEpochMilli(event.timeStamp))
+        val message = event.formattedMessage
+
+        for (line in  message.lines()) {
+            val formattedMessage = if (verbose) {
+                val className = event.loggerName.substringAfterLast('.')
+                "$time [$className] $line"
+            } else {
+                "$time $line"
+            }
+
+            val coloredMessage = when (event.level) {
+                Level.ERROR -> TextColors.brightRed(formattedMessage)
+                Level.WARN -> TextColors.yellow(formattedMessage)
+                else -> formattedMessage
+            }
+
+            // Print to stdout (stderr would interfere with piping)
+            terminal.println(coloredMessage)
+        }
+    }
+}

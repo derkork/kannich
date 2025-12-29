@@ -1,0 +1,3 @@
+# Maven Resolver connector for downloading artifacts from repositories.
+# BasicRepositoryConnectorFactory delegates to TransporterFactory for actual transport.
+org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory
