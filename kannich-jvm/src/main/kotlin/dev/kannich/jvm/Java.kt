@@ -1,6 +1,9 @@
 package dev.kannich.jvm
 
 import dev.kannich.stdlib.BaseTool
+import dev.kannich.stdlib.CacheTool
+import dev.kannich.stdlib.ExtractTool
+import dev.kannich.stdlib.FsTool
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.context.JobExecutionContext
 import org.slf4j.Logger
@@ -21,53 +24,47 @@ import org.slf4j.LoggerFactory
  * ```
  */
 class Java(version: String) : BaseTool(version) {
-    val logger: Logger = LoggerFactory.getLogger(Java::class.java)
+    private val logger: Logger = LoggerFactory.getLogger(Java::class.java)
+    private val cache = CacheTool()
+    private val extract = ExtractTool()
+    private val fs = FsTool()
+
+    companion object {
+        private const val CACHE_KEY = "java"
+    }
+
     /**
      * Gets the Java home directory path inside the container.
      * The path is computed based on the context's cache directory.
      */
     override fun home(ctx: JobExecutionContext): String =
-        "${ctx.pipelineContext.cacheDir}/java/temurin-$version"
+        cache.path("$CACHE_KEY/temurin-$version")
 
     /**
      * Ensures Java is installed in the cache.
      * Downloads from Adoptium (Eclipse Temurin) if not already present.
      */
     override fun ensureInstalled(ctx: JobExecutionContext) {
-        val homeDir = home(ctx)
-        if (isInstalled(ctx, homeDir)) {
+        val cacheKey = "$CACHE_KEY/temurin-$version"
+
+        if (cache.exists(cacheKey)) {
             logger.debug("Java $version is already installed.")
             return
         }
 
         logger.info("Java $version is not installed, downloading.")
-        val cacheDir = ctx.pipelineContext.cacheDir
-        val javaDir = "$cacheDir/java"
 
-        // Create java directory if needed
-        val mkdirResult = ctx.executor.exec(listOf("mkdir", "-p", javaDir), ctx.workingDir, emptyMap())
-        if (!mkdirResult.success) {
-            throw RuntimeException("Failed to create cache directory $javaDir: ${mkdirResult.stderr}")
-        }
+        // Ensure java cache directory exists
+        cache.ensureDir(CACHE_KEY)
 
-        // Download and extract Java
+        // Download and extract Java to the java cache directory
         // Using Eclipse Temurin (Adoptium) for reliable downloads
-        // Adoptium extracts to directories like "jdk-21.0.5+11", we rename to "temurin-$version"
         val downloadUrl = getDownloadUrl(version)
-        val extractCmd = "curl -sL \"$downloadUrl\" | tar xzf - -C \"$javaDir\""
+        val javaDir = cache.path(CACHE_KEY)
+        extract.downloadAndExtract(downloadUrl, javaDir)
 
-        val extractResult = ctx.executor.exec(listOf("sh", "-c", extractCmd), ctx.workingDir, emptyMap())
-        if (!extractResult.success) {
-            throw RuntimeException("Failed to download/extract Java $version: ${extractResult.stderr}")
-        }
-
-        // Find and rename the extracted directory (Adoptium uses "jdk-VERSION+BUILD" naming)
-        val renameCmd = "mv \"$javaDir\"/jdk-${version}* \"$homeDir\""
-        val renameResult = ctx.executor.exec(listOf("sh", "-c", renameCmd), ctx.workingDir, emptyMap())
-        if (!renameResult.success) {
-            throw RuntimeException("Failed to rename Java directory: ${renameResult.stderr}. " +
-                "Expected jdk-${version}* in $javaDir")
-        }
+        // Adoptium extracts to directories like "jdk-21.0.5+11", rename to our expected name
+        fs.move("$javaDir/jdk-${version}*", cache.path(cacheKey))
 
         logger.info("Successfully installed Java $version.")
     }
@@ -76,12 +73,7 @@ class Java(version: String) : BaseTool(version) {
         val homeDir = home(ctx)
         val cmd = listOf("$homeDir/bin/java") + args.toList()
         val env = mapOf("JAVA_HOME" to homeDir)
-        return ctx.executor.exec(cmd, ctx.workingDir, env)
-    }
-
-    private fun isInstalled(ctx: JobExecutionContext, homeDir: String): Boolean {
-        val result = ctx.executor.exec(listOf("test", "-d", homeDir), ctx.workingDir, emptyMap())
-        return result.success
+        return ctx.executor.exec(cmd, ctx.workingDir, env, false)
     }
 
     /**

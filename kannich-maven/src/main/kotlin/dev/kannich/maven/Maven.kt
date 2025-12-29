@@ -2,6 +2,8 @@ package dev.kannich.maven
 
 import dev.kannich.jvm.Java
 import dev.kannich.stdlib.BaseTool
+import dev.kannich.stdlib.CacheTool
+import dev.kannich.stdlib.ExtractTool
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.context.JobExecutionContext
 import org.slf4j.Logger
@@ -24,13 +26,20 @@ import org.slf4j.LoggerFactory
  * ```
  */
 class Maven(version: String, private val java: Java) : BaseTool(version) {
-    val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
+    private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
+    private val cache = CacheTool()
+    private val extract = ExtractTool()
+
+    companion object {
+        private const val CACHE_KEY = "maven"
+    }
+
     /**
      * Gets the Maven home directory path inside the container.
      * The path is computed based on the context's cache directory.
      */
     override fun home(ctx: JobExecutionContext): String =
-        "${ctx.pipelineContext.cacheDir}/maven/apache-maven-$version"
+        cache.path("$CACHE_KEY/apache-maven-$version")
 
     /**
      * Ensures Maven is installed in the cache.
@@ -40,36 +49,27 @@ class Maven(version: String, private val java: Java) : BaseTool(version) {
         // Ensure Java is installed first
         java.ensureInstalled(ctx)
 
-        val homeDir = home(ctx)
-        if (isInstalled(ctx, homeDir)) {
+        val cacheKey = "$CACHE_KEY/apache-maven-$version"
+
+        if (cache.exists(cacheKey)) {
             logger.debug("Maven $version is already installed.")
             return
         }
 
         logger.info("Maven $version is not installed, downloading.")
 
-        val cacheDir = ctx.pipelineContext.cacheDir
-        val mavenDir = "$cacheDir/maven"
-
-        // Create maven directory if needed
-        val mkdirResult = ctx.executor.exec(listOf("mkdir", "-p", mavenDir), ctx.workingDir, emptyMap())
-        if (!mkdirResult.success) {
-            throw RuntimeException("Failed to create cache directory $mavenDir: ${mkdirResult.stderr}")
-        }
+        // Ensure maven cache directory exists
+        cache.ensureDir(CACHE_KEY)
 
         // Download and extract Maven
-        // Apache Maven tarballs extract to "apache-maven-$version" which matches our home() path
+        // Apache Maven tarballs extract to "apache-maven-$version" which matches our cache key
         val downloadUrl = getDownloadUrl(version)
-        val extractCmd = "curl -sL \"$downloadUrl\" | tar xzf - -C \"$mavenDir\""
-
-        val extractResult = ctx.executor.exec(listOf("sh", "-c", extractCmd), ctx.workingDir, emptyMap())
-        if (!extractResult.success) {
-            throw RuntimeException("Failed to download/extract Maven $version: ${extractResult.stderr}")
-        }
+        val mavenDir = cache.path(CACHE_KEY)
+        extract.downloadAndExtract(downloadUrl, mavenDir)
 
         // Verify extraction succeeded
-        if (!isInstalled(ctx, homeDir)) {
-            throw RuntimeException("Maven extraction failed: expected directory $homeDir not found")
+        if (!cache.exists(cacheKey)) {
+            throw RuntimeException("Maven extraction failed: expected directory ${cache.path(cacheKey)} not found")
         }
 
         logger.info("Successfully installed Maven $version.")
@@ -84,12 +84,7 @@ class Maven(version: String, private val java: Java) : BaseTool(version) {
             "MAVEN_HOME" to homeDir,
             "M2_HOME" to homeDir
         )
-        return ctx.executor.exec(cmd, ctx.workingDir, env)
-    }
-
-    private fun isInstalled(ctx: JobExecutionContext, homeDir: String): Boolean {
-        val result = ctx.executor.exec(listOf("test", "-d", homeDir), ctx.workingDir, emptyMap())
-        return result.success
+        return ctx.executor.exec(cmd, ctx.workingDir, env, false)
     }
 
     /**

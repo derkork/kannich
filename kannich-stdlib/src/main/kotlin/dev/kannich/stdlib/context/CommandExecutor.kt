@@ -13,5 +13,5 @@ interface CommandExecutor {
      * @param env Environment variables to set for the command
      * @return The result of executing the command
      */
-    fun exec(command: List<String>, workingDir: String, env: Map<String, String>): ExecResult
+    fun exec(command: List<String>, workingDir: String, env: Map<String, String>, silent: Boolean): ExecResult
 }

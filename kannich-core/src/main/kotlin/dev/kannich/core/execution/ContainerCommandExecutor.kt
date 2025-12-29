@@ -13,12 +13,12 @@ class ContainerCommandExecutor(
     private val defaultWorkingDir: String
 ) : CommandExecutor {
 
-    override fun exec(command: List<String>, workingDir: String, env: Map<String, String>): StdlibExecResult {
+    override fun exec(command: List<String>, workingDir: String, env: Map<String, String>, silent: Boolean): StdlibExecResult {
         val coreResult = containerManager.exec(
             command = command,
             workingDir = workingDir,
             env = env,
-            silent = false
+            silent = silent
         )
         return coreResult.toStdlib()
     }

@@ -1,6 +1,8 @@
 package dev.kannich.stdlib
 
+import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.context.JobExecutionContext
+import org.slf4j.LoggerFactory
 
 /**
  * Scope available inside job blocks.
@@ -10,23 +12,47 @@ import dev.kannich.stdlib.context.JobExecutionContext
 class JobScope(
     private val ctx: JobExecutionContext
 ) {
+    private val logger = LoggerFactory.getLogger(JobScope::class.java)
+
     /**
      * Shell tool for executing arbitrary commands.
      */
     val shell: ShellTool = ShellTool()
 
     /**
+     * Filesystem tool for file/directory operations.
+     */
+    val fs: FsTool = FsTool()
+
+    /**
+     * Download tool for fetching files from URLs.
+     */
+    val download: DownloadTool = DownloadTool()
+
+    /**
+     * Extract tool for extracting archives.
+     */
+    val extract: ExtractTool = ExtractTool()
+
+    /**
+     * Cache tool for managing the Kannich cache.
+     */
+    val cache: CacheTool = CacheTool()
+
+    /**
      * Executes a block and catches any JobFailedException.
      * Use this to continue execution even if commands fail.
      *
      * @param block The block to execute
+     * @return true if the block executed successfully, false if it failed
      */
-    fun allowFailure(block: () -> Unit) {
-        try {
+    fun allowFailure(block: () -> Unit): Boolean {
+        return try {
             block()
+            true
         } catch (e: JobFailedException) {
-            // Failure is allowed, continue execution
-            System.err.println("[WARN] Allowed failure: ${e.message}")
+            logger.warn("Allowed failure: ${e.message}")
+            false
         }
     }
 }
@@ -36,45 +62,29 @@ class JobScope(
  */
 class ShellTool {
     /**
-     * Executes a shell command with the given arguments.
-     * Throws JobFailedException if the command fails.
+     * Executes a command with the given arguments.
+     * Returns the result for inspection (stdout, stderr, exit code).
      *
      * @param command The command to execute
      * @param args Arguments to pass to the command
-     * @throws JobFailedException if the command fails
+     * @return The execution result
      */
-    fun exec(command: String, vararg args: String) {
+    fun exec(command: String, vararg args: String): ExecResult {
         val ctx = JobExecutionContext.current()
         val fullCommand = listOf(command) + args.toList()
-        val result = ctx.executor.exec(fullCommand, ctx.workingDir, emptyMap())
-        if (!result.success) {
-            val errorMessage = if (result.stderr.isNotBlank()) {
-                result.stderr
-            } else {
-                "Exit code: ${result.exitCode}"
-            }
-            throw JobFailedException("Shell command failed: $command - $errorMessage")
-        }
+        return ctx.executor.exec(fullCommand, ctx.workingDir, emptyMap(), false)
     }
 
     /**
      * Executes a shell command string (interpreted by sh -c).
-     * Throws JobFailedException if the command fails.
+     * Returns the result for inspection (stdout, stderr, exit code).
      *
      * @param command The shell command string to execute
-     * @throws JobFailedException if the command fails
+     * @return The execution result
      */
-    fun execShell(command: String) {
+    fun execShell(command: String): ExecResult {
         val ctx = JobExecutionContext.current()
-        val result = ctx.executor.exec(listOf("sh", "-c", command), ctx.workingDir, emptyMap())
-        if (!result.success) {
-            val errorMessage = if (result.stderr.isNotBlank()) {
-                result.stderr
-            } else {
-                "Exit code: ${result.exitCode}"
-            }
-            throw JobFailedException("Shell command failed: $command - $errorMessage")
-        }
+        return ctx.executor.exec(listOf("sh", "-c", command), ctx.workingDir, emptyMap(), false)
     }
 }
 
