@@ -35,6 +35,15 @@ pipeline {
         }
     }
 
+    execution("testenv") {
+        sequentially {
+            job("testenv") {
+                shell.execShell("echo \$CI_DUMMY_VAR")
+                shell.execShell("echo 'noot'")
+            }
+        }
+    }
+
     execution("build") {
         sequentially {
             job(compile)

@@ -10,6 +10,9 @@ KANNICH_VERSION="${KANNICH_VERSION:-latest}"
 KANNICH_IMAGE="kannich/builder:${KANNICH_VERSION}"
 KANNICH_CACHE_DIR="${KANNICH_CACHE_DIR:-$HOME/.kannich/cache}"
 
+# Default prefixes for environment variables to pass to Docker
+DEFAULT_ENV_PREFIXES="CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -65,6 +68,30 @@ fi
 # Container name for cleanup
 CONTAINER_NAME="kannich-$$"
 
+# Read environment variable prefixes from .kannichenv or use defaults
+ENV_PREFIXES=""
+if [ -f "$PROJECT_DIR/.kannichenv" ]; then
+    # Read prefixes from file, ignoring comments and empty lines
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        line=$(echo "$line" | sed 's/#.*//' | xargs)
+        if [ -n "$line" ]; then
+            ENV_PREFIXES="$ENV_PREFIXES $line"
+        fi
+    done < "$PROJECT_DIR/.kannichenv"
+else
+    ENV_PREFIXES="$DEFAULT_ENV_PREFIXES"
+fi
+
+# Build environment variable arguments for docker
+ENV_ARGS=""
+for prefix in $ENV_PREFIXES; do
+    # Find all environment variables starting with this prefix
+    for var in $(env | grep "^$prefix" | cut -d= -f1); do
+        ENV_ARGS="$ENV_ARGS -e $var"
+    done
+done
+
 # Cleanup function to stop the container on exit
 cleanup() {
     if [ -n "$CONTAINER_NAME" ]; then
@@ -79,6 +106,7 @@ trap cleanup EXIT INT TERM
 # --init: Use tini for proper signal handling and zombie reaping
 # --name: Named container for cleanup on Ctrl+C
 # Pass host paths as environment variables for nested container mounts
+# shellcheck disable=SC2086
 docker run --rm -it \
     --init \
     --name "$CONTAINER_NAME" \
@@ -87,6 +115,7 @@ docker run --rm -it \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -e "KANNICH_HOST_PROJECT_DIR=$PROJECT_DOCKER_PATH" \
     -e "KANNICH_HOST_CACHE_DIR=$CACHE_DOCKER_PATH" \
+    $ENV_ARGS \
     -w /workspace \
     "$KANNICH_IMAGE" \
     /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar "$@"

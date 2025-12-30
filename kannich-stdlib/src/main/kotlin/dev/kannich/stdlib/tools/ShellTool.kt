@@ -18,7 +18,7 @@ class ShellTool {
     fun exec(command: String, vararg args: String): ExecResult {
         val ctx = JobExecutionContext.current()
         val fullCommand = listOf(command) + args.toList()
-        return ctx.executor.exec(fullCommand, ctx.workingDir, emptyMap(), false)
+        return ctx.executor.exec(fullCommand, ctx.workingDir, ctx.pipelineContext.env, false)
     }
 
     /**
@@ -30,6 +30,6 @@ class ShellTool {
      */
     fun execShell(command: String): ExecResult {
         val ctx = JobExecutionContext.current()
-        return ctx.executor.exec(listOf("sh", "-c", command), ctx.workingDir, emptyMap(), false)
+        return ctx.executor.exec(listOf("sh", "-c", command), ctx.workingDir, ctx.pipelineContext.env, false)
     }
 }

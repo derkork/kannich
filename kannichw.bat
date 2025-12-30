@@ -10,6 +10,9 @@ if "%KANNICH_VERSION%"=="" set KANNICH_VERSION=latest
 set KANNICH_IMAGE=kannich/builder:%KANNICH_VERSION%
 if "%KANNICH_CACHE_DIR%"=="" set KANNICH_CACHE_DIR=%USERPROFILE%\.kannich\cache
 
+REM Default prefixes for environment variables to pass to Docker
+set DEFAULT_ENV_PREFIXES=CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_
+
 REM Determine project directory
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
@@ -67,6 +70,52 @@ REM Generate unique container name using timestamp
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DATETIME=%%I
 set CONTAINER_NAME=kannich-%DATETIME:~0,14%
 
+REM Read environment variable prefixes from .kannichenv or use defaults
+set ENV_PREFIXES=
+if exist "%PROJECT_DIR%\.kannichenv" (
+    for /f "usebackq eol=# tokens=*" %%P in ("%PROJECT_DIR%\.kannichenv") do (
+        set "LINE=%%P"
+        if defined LINE (
+            set "ENV_PREFIXES=!ENV_PREFIXES! %%P"
+        )
+    )
+) else (
+    set ENV_PREFIXES=%DEFAULT_ENV_PREFIXES%
+)
+
+REM Build environment variable arguments for docker
+set ENV_ARGS=
+for %%P in (%ENV_PREFIXES%) do (
+    for /f "tokens=1 delims==" %%V in ('set 2^>nul') do (
+        set "VARNAME=%%V"
+        set "PREFIX=%%P"
+        REM Check if variable name starts with prefix
+        if "!VARNAME:~0,3!"=="!PREFIX:~0,3!" (
+            call :check_prefix "%%V" "%%P"
+        )
+    )
+)
+goto :after_check_prefix
+
+:check_prefix
+set "VARNAME=%~1"
+set "PREFIX=%~2"
+set "PREFIX_LEN=0"
+set "TEMP_PREFIX=%PREFIX%"
+:count_prefix_len
+if defined TEMP_PREFIX (
+    set "TEMP_PREFIX=!TEMP_PREFIX:~1!"
+    set /a PREFIX_LEN+=1
+    goto :count_prefix_len
+)
+set "VAR_PREFIX=!VARNAME:~0,%PREFIX_LEN%!"
+if "!VAR_PREFIX!"=="!PREFIX!" (
+    set "ENV_ARGS=!ENV_ARGS! -e !VARNAME!"
+)
+goto :eof
+
+:after_check_prefix
+
 REM Run Kannich inside Docker
 REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
@@ -79,6 +128,7 @@ docker run --rm -it ^
     -v //var/run/docker.sock:/var/run/docker.sock ^
     -e "KANNICH_HOST_PROJECT_DIR=%PROJECT_DOCKER_PATH%" ^
     -e "KANNICH_HOST_CACHE_DIR=%CACHE_DOCKER_PATH%" ^
+    %ENV_ARGS% ^
     -w /workspace ^
     %KANNICH_IMAGE% ^
     /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar %*
