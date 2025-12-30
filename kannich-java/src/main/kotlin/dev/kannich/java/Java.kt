@@ -1,4 +1,4 @@
-package dev.kannich.jvm
+package dev.kannich.java
 
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.CacheTool

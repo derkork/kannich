@@ -1,6 +1,6 @@
 package dev.kannich.maven
 
-import dev.kannich.jvm.Java
+import dev.kannich.java.Java
 import dev.kannich.stdlib.JobScope
 import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail

@@ -1,15 +1,14 @@
 ﻿## Kannich
 
-Kannich is a CI pipeline executor for running CI builds anywhere - on your local machine or in any CI/CD service. It is designed to avoid the YAML hell often associated with configuring CI pipelines. In Kannich you define your CI jobs using a KotlinScript-based DSL which provides you with the full power of a programming language to define your CI workflows. This DSL is extensible allowing you to reuse and share common CI logic across multiple projects. DSL files can be hosted in any HTTP accessible location, making it easy to centralize and manage your CI configurations. 
+Kannich is a CI pipeline executor for running CI builds anywhere - on your local machine or in any CI/CD service. It is designed to avoid the YAML and shell script hell often associated with configuring CI pipelines. In Kannich you define your CI jobs using a KotlinScript-based DSL which provides you with the full power of a programming language to define your CI workflows. This DSL is extensible allowing you to reuse and share common CI logic across multiple projects. You can also define custom tools that install software and run or execute complex workflows.
 
 ### Features
 
 - Kannich can be bootstrapped locally using a kannichw wrapper script (similar to Gradle's gradlew or Maven's mvnw). 
 - Kannich executes all CI jobs in a Docker container ensuring a consistent and isolated build environment.
 - Kannich supports caching of dependencies and build artifacts to speed up subsequent builds.
-- Kannich provides built-in support for common CI tasks such as checking out code from Git repositories, running tests, building artifacts, and publishing results.
 - Kannich can be easily integrated with popular CI/CD services like GitHub Actions, GitLab CI, Jenkins, etc.
-- Because you can run Kannich locally, you can test and debug your CI jobs without needing to push changes to a remote CI server all the time.
+- Because you can run Kannich locally, you can test and debug your CI jobs without needing to push changes to a remote CI server all the time. In fact you can use this to build stuff locally without even having a toolchain installed. All you need is a docker daemon.
 
 ### A sample Kannich DSL file
 

@@ -10,7 +10,7 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>kannich-jvm</artifactId>
+    <artifactId>kannich-java</artifactId>
     <name>Kannich JVM Plugin</name>
     <description>JVM plugin for Kannich - Java/Kotlin SDK management</description>
 

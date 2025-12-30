@@ -5,9 +5,9 @@
 
 @file:DependsOn("dev.kannich:kannich-stdlib:0.1.0-SNAPSHOT")
 @file:DependsOn("dev.kannich:kannich-maven:0.1.0-SNAPSHOT")
-@file:DependsOn("dev.kannich:kannich-jvm:0.1.0-SNAPSHOT")
+@file:DependsOn("dev.kannich:kannich-java:0.1.0-SNAPSHOT")
 
-import dev.kannich.jvm.Java
+import dev.kannich.java.Java
 import dev.kannich.maven.Maven
 import dev.kannich.stdlib.*
 

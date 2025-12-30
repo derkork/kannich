@@ -16,7 +16,7 @@
         <module>kannich-stdlib</module>
         <module>kannich-core</module>
         <module>kannich-cli</module>
-        <module>kannich-jvm</module>
+        <module>kannich-java</module>
         <module>kannich-maven</module>
         <module>kannich-gpg</module>
         <module>kannich-trivy</module>
@@ -152,7 +152,7 @@
             </dependency>
             <dependency>
                 <groupId>dev.kannich</groupId>
-                <artifactId>kannich-jvm</artifactId>
+                <artifactId>kannich-java</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

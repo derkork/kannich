@@ -29,7 +29,7 @@
         <!-- JVM module for Java dependency -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-jvm</artifactId>
+            <artifactId>kannich-java</artifactId>
         </dependency>
 
         <dependency>
