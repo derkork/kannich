@@ -122,7 +122,7 @@ The idea behind this is to provide a simple and flexible way to run CI scripts c
 
 ### Technical implementation
 
-Kannich is implemented in Kotlin and is built with the Maven build system. If it is already installed on the user's machine, it can build itself. However, there's also a bootstrapping script which can bootstrap a Kannich installation from a Git checkout of Kannich.
+Kannich is implemented in Kotlin and is built with the Maven build system. If it is already installed on the user's machine, it can build itself. However, there's also a bootstrapping mode which can bootstrap a Kannich installation from a Git checkout of Kannich.
 
 ---
 
@@ -148,8 +148,6 @@ kannich/
 ├── kannich-builder-image/  # Custom builder Docker image
 ├── kannichw                # End-user wrapper (Unix) - committed with user projects
 ├── kannichw.bat            # End-user wrapper (Windows)
-├── bootstrap.sh            # Developer bootstrap script (Unix)
-└── bootstrap.bat           # Developer bootstrap script (Windows)
 ```
 
 ### Code Style
@@ -172,10 +170,10 @@ Keep comments concise - one line preferred, two maximum.
 
 ### Building Kannich
 
-**For Kannich developers** (requires JVM and Maven locally):
+**For Kannich developers** (requires JVM, Maven and Docker locally):
 ```bash
-./bootstrap.sh    # Unix
-bootstrap.bat     # Windows
+# builds kannich and the docker image.
+mvn -Pbootstrap install
 ```
 
 **For projects using Kannich** (requires only Docker):
@@ -193,9 +191,3 @@ bootstrap.bat     # Windows
 | Job Isolation | overlay2 volumes | Native Docker driver, efficient, no privileged mode |
 | DSL Engine | Custom script definition | Supports @file:DependsOn with Maven resolution |
 
-### Dependencies
-
-Core dependencies managed in parent POM:
-- `org.jetbrains.kotlin:kotlin-scripting-*` - Script host and compilation
-- `com.github.docker-java:docker-java-*` - Docker API client
-- `org.slf4j:slf4j-api` - Logging facade

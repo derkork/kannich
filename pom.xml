@@ -242,4 +242,18 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Bootstrap profile: builds all modules and creates the Docker image -->
+        <!-- Usage: mvn -Pbootstrap install -->
+        <profile>
+            <id>bootstrap</id>
+            <modules>
+                <module>kannich-builder-image</module>
+            </modules>
+            <properties>
+                <skipTests>true</skipTests>
+            </properties>
+        </profile>
+    </profiles>
 </project>
