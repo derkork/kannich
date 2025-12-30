@@ -37,6 +37,11 @@ class JobScope() {
     val cache: CacheTool = CacheTool()
 
     /**
+     * APT tool for installing system packages with caching.
+     */
+    val apt: AptTool = AptTool()
+
+    /**
      * Executes a block and catches any JobFailedException.
      * Use this to continue execution even if commands fail.
      *
