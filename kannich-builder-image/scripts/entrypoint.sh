@@ -1,6 +1,6 @@
 #!/bin/bash
 # Kannich builder entrypoint script
-# Sets up the build environment
+# Sets up the build environment and handles signal propagation
 
 set -e
 
@@ -17,5 +17,5 @@ if [ $# -gt 0 ]; then
     exec "$@"
 fi
 
-# Otherwise keep container running
+# Otherwise keep container running (for exec-based job execution)
 exec tail -f /dev/null

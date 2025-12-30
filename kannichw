@@ -62,9 +62,26 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     CACHE_DOCKER_PATH=$(echo "$KANNICH_CACHE_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
 fi
 
+# Container name for cleanup
+CONTAINER_NAME="kannich-$$"
+
+# Cleanup function to stop the container on exit
+cleanup() {
+    if [ -n "$CONTAINER_NAME" ]; then
+        docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
+}
+
+# Trap signals to ensure cleanup
+trap cleanup EXIT INT TERM
+
 # Run Kannich inside Docker
+# --init: Use tini for proper signal handling and zombie reaping
+# --name: Named container for cleanup on Ctrl+C
 # Pass host paths as environment variables for nested container mounts
-exec docker run --rm -it \
+docker run --rm -it \
+    --init \
+    --name "$CONTAINER_NAME" \
     -v "$PROJECT_DOCKER_PATH:/workspace" \
     -v "$CACHE_DOCKER_PATH:/kannich/cache" \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -72,4 +89,4 @@ exec docker run --rm -it \
     -e "KANNICH_HOST_CACHE_DIR=$CACHE_DOCKER_PATH" \
     -w /workspace \
     "$KANNICH_IMAGE" \
-    java -jar /kannich/kannich-cli.jar "$@"
+    /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar "$@"

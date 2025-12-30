@@ -33,23 +33,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Eclipse Temurin JDK 21
-RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/adoptium.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends temurin-21-jdk \
-    && rm -rf /var/lib/apt/lists/*
+# Install Eclipse Temurin JDK 21 to private path (not in global PATH)
+# This allows build pipelines to install their own Java without conflicts
+RUN curl -fsSL -o /tmp/jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse" \
+    && mkdir -p /kannich/jdk \
+    && tar -xzf /tmp/jdk.tar.gz -C /kannich/jdk --strip-components=1 \
+    && rm /tmp/jdk.tar.gz
 
-ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
-
-# Install Maven 3.9.x
-ENV MAVEN_VERSION=3.9.9
-ENV MAVEN_HOME=/opt/maven
-RUN curl -fsSL https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
-    | tar xz -C /opt \
-    && mv /opt/apache-maven-${MAVEN_VERSION} ${MAVEN_HOME}
-ENV PATH="${MAVEN_HOME}/bin:${PATH}"
+# JAVA_HOME for kannich's private JDK - NOT added to PATH intentionally
+ENV KANNICH_JAVA_HOME=/kannich/jdk
 
 # Create Kannich directories
 RUN mkdir -p /kannich/cache /kannich/overlays /workspace /root/.m2/repository
@@ -68,5 +60,5 @@ RUN chmod +x /kannich/scripts/*
 # Set working directory
 WORKDIR /workspace
 
-# Default command keeps container running for exec
-CMD ["tail", "-f", "/dev/null"]
+# Use entrypoint script for kannich invocation
+ENTRYPOINT ["/kannich/scripts/entrypoint.sh"]

@@ -63,9 +63,17 @@ set CACHE_DRIVE_LETTER=%CACHE_DIR_DOCKER:~0,1%
 set CACHE_PATH_REMAINDER=%CACHE_DIR_DOCKER:~2%
 set CACHE_DOCKER_PATH=/%CACHE_DRIVE_LETTER%%CACHE_PATH_REMAINDER%
 
+REM Generate unique container name using timestamp
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DATETIME=%%I
+set CONTAINER_NAME=kannich-%DATETIME:~0,14%
+
 REM Run Kannich inside Docker
+REM --init: Use tini for proper signal handling and zombie reaping
+REM --name: Named container for potential cleanup
 REM Pass host paths as environment variables for nested container mounts
 docker run --rm -it ^
+    --init ^
+    --name %CONTAINER_NAME% ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
     -v //var/run/docker.sock:/var/run/docker.sock ^
@@ -73,6 +81,6 @@ docker run --rm -it ^
     -e "KANNICH_HOST_CACHE_DIR=%CACHE_DOCKER_PATH%" ^
     -w /workspace ^
     %KANNICH_IMAGE% ^
-    java -jar /kannich/kannich-cli.jar %*
+    /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar %*
 
 endlocal

@@ -1,13 +1,17 @@
 package dev.kannich.core.docker
 
+import dev.kannich.core.ShutdownManager
 import org.slf4j.LoggerFactory
 import dev.kannich.stdlib.context.ExecResult
 import java.io.Closeable
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Manages the lifecycle of a Kannich build container.
  * Handles container creation, job execution, and cleanup.
+ * Thread-safe and idempotent for proper shutdown handling.
  */
 class ContainerManager(
     private val client: KannichDockerClient,
@@ -18,8 +22,9 @@ class ContainerManager(
 ) : Closeable {
 
     private val logger = LoggerFactory.getLogger(ContainerManager::class.java)
-    private var containerId: String? = null
-    private var isStarted = false
+    private val containerIdRef = AtomicReference<String?>(null)
+    private val isStarted = AtomicBoolean(false)
+    private val isClosed = AtomicBoolean(false)
 
     /**
      * The project directory path inside the container.
@@ -34,14 +39,19 @@ class ContainerManager(
     /**
      * Initializes the build container.
      * Pulls the builder image if needed and creates the container.
+     * Registers with ShutdownManager for cleanup on SIGINT/SIGTERM.
      */
     fun initialize() {
         logger.info("Initializing build container...")
         client.ensureBuilderImage()
-        containerId = client.createBuildContainer(projectDir, cacheDir, "/workspace", hostProjectPath, hostCachePath)
-        client.startContainer(containerId!!)
-        isStarted = true
-        logger.info("Build container ready: ${containerId?.take(12)}")
+        val id = client.createBuildContainer(projectDir, cacheDir, "/workspace", hostProjectPath, hostCachePath)
+        containerIdRef.set(id)
+        client.startContainer(id)
+        isStarted.set(true)
+        logger.info("Build container ready: ${id.take(12)}")
+
+        // Register for cleanup on shutdown
+        ShutdownManager.register(this)
 
         // Verify mounts are accessible
         verifyMounts()
@@ -101,7 +111,7 @@ class ContainerManager(
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
     ): ExecResult {
-        checkInitialized()
+        val containerId = checkInitialized()
 
         if (!silent) {
             logger.info("Executing: ${command.joinToString(" ")}")
@@ -110,7 +120,7 @@ class ContainerManager(
             logger.debug("Executing: ${command.joinToString(" ")}")
         }
         return client.execInContainer(
-            containerId!!,
+            containerId,
             command,
             workingDir,
             env,
@@ -135,9 +145,9 @@ class ContainerManager(
      * Copies artifacts from the container to the host.
      */
     fun copyArtifacts(containerPath: String, hostDir: File) {
-        checkInitialized()
+        val containerId = checkInitialized()
         logger.info("Copying artifacts from $containerPath to ${hostDir.absolutePath}")
-        client.copyFromContainer(containerId!!, containerPath, hostDir)
+        client.copyFromContainer(containerId, containerPath, hostDir)
     }
 
     /**
@@ -147,7 +157,7 @@ class ContainerManager(
      * @param parentLayerId Optional parent layer to copy from. If null, copies from /workspace.
      */
     fun createJobLayer(parentLayerId: String? = null): String {
-        checkInitialized()
+        checkInitialized() // Just validate, don't need the ID here
 
         val layerId = "layer-${System.currentTimeMillis()}"
         val layerDir = "/kannich/overlays/$layerId"
@@ -190,6 +200,10 @@ class ContainerManager(
      * Removes a job layer.
      */
     fun removeJobLayer(layerId: String) {
+        // Skip cleanup if we're shutting down or already closed
+        if (isClosed.get() || ShutdownManager.isShuttingDown()) {
+            return
+        }
         checkInitialized()
 
         val layerDir = "/kannich/overlays/$layerId"
@@ -197,19 +211,33 @@ class ContainerManager(
         logger.debug("Removed job layer: $layerId")
     }
 
-    private fun checkInitialized() {
-        check(containerId != null && isStarted) {
+    private fun checkInitialized(): String {
+        val containerId = containerIdRef.get()
+        check(containerId != null && isStarted.get()) {
             "Container not initialized. Call initialize() first."
         }
+        return containerId
     }
 
+    /**
+     * Cleans up the build container.
+     * Thread-safe and idempotent - safe to call multiple times or from shutdown hook.
+     */
     override fun close() {
-        containerId?.let { id ->
-            logger.info("Cleaning up build container: ${id.take(12)}")
-            client.stopContainer(id)
-            client.removeContainer(id)
+        // Ensure we only close once
+        if (!isClosed.compareAndSet(false, true)) {
+            return
         }
-        containerId = null
-        isStarted = false
+
+        // Unregister from shutdown manager (no-op if called from shutdown hook)
+        ShutdownManager.unregister(this)
+
+        val containerId = containerIdRef.getAndSet(null)
+        if (containerId != null) {
+            logger.info("Cleaning up build container: ${containerId.take(12)}")
+            client.stopContainer(containerId)
+            client.removeContainer(containerId)
+        }
+        isStarted.set(false)
     }
 }
