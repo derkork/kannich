@@ -92,6 +92,36 @@ for prefix in $ENV_PREFIXES; do
     done
 done
 
+# Always forward all DOCKER_* environment variables (regardless of .kannichenv)
+for var in $(env | grep "^DOCKER_" | cut -d= -f1); do
+    ENV_ARGS="$ENV_ARGS -e $var"
+done
+
+# Determine Docker socket mount
+# If DOCKER_HOST is set and is a unix socket, use that path
+# Otherwise default to /var/run/docker.sock
+DOCKER_SOCKET_MOUNT=""
+if [ -n "$DOCKER_HOST" ]; then
+    case "$DOCKER_HOST" in
+        unix://*)
+            # Extract socket path from unix:///path/to/socket
+            DOCKER_SOCKET_PATH="${DOCKER_HOST#unix://}"
+            DOCKER_SOCKET_MOUNT="-v $DOCKER_SOCKET_PATH:$DOCKER_SOCKET_PATH"
+            ;;
+        tcp://*)
+            # TCP connection - no socket mount needed, DOCKER_HOST env var handles it
+            DOCKER_SOCKET_MOUNT=""
+            ;;
+        *)
+            # Unknown format, try default socket
+            DOCKER_SOCKET_MOUNT="-v /var/run/docker.sock:/var/run/docker.sock"
+            ;;
+    esac
+else
+    # No DOCKER_HOST set, use default socket
+    DOCKER_SOCKET_MOUNT="-v /var/run/docker.sock:/var/run/docker.sock"
+fi
+
 # Cleanup function to stop the container on exit
 cleanup() {
     if [ -n "$CONTAINER_NAME" ]; then
@@ -112,7 +142,7 @@ docker run --rm -it \
     --name "$CONTAINER_NAME" \
     -v "$PROJECT_DOCKER_PATH:/workspace" \
     -v "$CACHE_DOCKER_PATH:/kannich/cache" \
-    -v /var/run/docker.sock:/var/run/docker.sock \
+    $DOCKER_SOCKET_MOUNT \
     -e "KANNICH_HOST_PROJECT_DIR=$PROJECT_DOCKER_PATH" \
     -e "KANNICH_HOST_CACHE_DIR=$CACHE_DOCKER_PATH" \
     $ENV_ARGS \

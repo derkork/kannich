@@ -116,6 +116,37 @@ goto :eof
 
 :after_check_prefix
 
+REM Always forward all DOCKER_* environment variables (regardless of .kannichenv)
+for /f "tokens=1 delims==" %%V in ('set DOCKER_ 2^>nul') do (
+    set "ENV_ARGS=!ENV_ARGS! -e %%V"
+)
+
+REM Determine Docker socket mount based on DOCKER_HOST
+REM If DOCKER_HOST is set and is a unix socket, mount that path
+REM If tcp:// or npipe://, no socket mount needed (env var handles it)
+REM Otherwise default to /var/run/docker.sock
+set DOCKER_SOCKET_MOUNT=-v //var/run/docker.sock:/var/run/docker.sock
+if defined DOCKER_HOST (
+    echo !DOCKER_HOST! | findstr /B /C:"unix://" >nul
+    if !errorlevel!==0 (
+        REM Extract socket path from unix:///path/to/socket
+        set "DOCKER_SOCKET_PATH=!DOCKER_HOST:unix://=!"
+        set "DOCKER_SOCKET_MOUNT=-v !DOCKER_SOCKET_PATH!:!DOCKER_SOCKET_PATH!"
+    ) else (
+        echo !DOCKER_HOST! | findstr /B /C:"tcp://" >nul
+        if !errorlevel!==0 (
+            REM TCP connection - no socket mount needed
+            set "DOCKER_SOCKET_MOUNT="
+        ) else (
+            echo !DOCKER_HOST! | findstr /B /C:"npipe://" >nul
+            if !errorlevel!==0 (
+                REM Named pipe connection - no socket mount needed
+                set "DOCKER_SOCKET_MOUNT="
+            )
+        )
+    )
+)
+
 REM Run Kannich inside Docker
 REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
@@ -125,7 +156,7 @@ docker run --rm -it ^
     --name %CONTAINER_NAME% ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
-    -v //var/run/docker.sock:/var/run/docker.sock ^
+    %DOCKER_SOCKET_MOUNT% ^
     -e "KANNICH_HOST_PROJECT_DIR=%PROJECT_DOCKER_PATH%" ^
     -e "KANNICH_HOST_CACHE_DIR=%CACHE_DOCKER_PATH%" ^
     %ENV_ARGS% ^
