@@ -31,8 +31,20 @@ if ! docker info &> /dev/null 2>&1; then
     exit 1
 fi
 
-# Ensure cache directory exists
-mkdir -p "$KANNICH_CACHE_DIR"
+# Ensure cache directory exists on host (required for Docker mount)
+if [ ! -d "$KANNICH_CACHE_DIR" ]; then
+    echo "Creating cache directory: $KANNICH_CACHE_DIR"
+    mkdir -p "$KANNICH_CACHE_DIR" || {
+        echo -e "${RED}Error: Failed to create cache directory: $KANNICH_CACHE_DIR${NC}"
+        exit 1
+    }
+fi
+
+# Verify cache directory is accessible
+if [ ! -d "$KANNICH_CACHE_DIR" ]; then
+    echo -e "${RED}Error: Cache directory not accessible: $KANNICH_CACHE_DIR${NC}"
+    exit 1
+fi
 
 # Pull image if not present
 if ! docker image inspect "$KANNICH_IMAGE" &> /dev/null; then
@@ -40,14 +52,24 @@ if ! docker image inspect "$KANNICH_IMAGE" &> /dev/null; then
     docker pull "$KANNICH_IMAGE"
 fi
 
+# Convert paths to Docker-compatible format if running on Windows (MSYS/Git Bash)
+PROJECT_DOCKER_PATH="$PROJECT_DIR"
+CACHE_DOCKER_PATH="$KANNICH_CACHE_DIR"
+
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    # Convert D:\foo to /d/foo
+    PROJECT_DOCKER_PATH=$(echo "$PROJECT_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
+    CACHE_DOCKER_PATH=$(echo "$KANNICH_CACHE_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
+fi
+
 # Run Kannich inside Docker
 # Pass host paths as environment variables for nested container mounts
 exec docker run --rm -it \
-    -v "$PROJECT_DIR:/workspace" \
-    -v "$KANNICH_CACHE_DIR:/kannich/cache" \
+    -v "$PROJECT_DOCKER_PATH:/workspace" \
+    -v "$CACHE_DOCKER_PATH:/kannich/cache" \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    -e "KANNICH_HOST_PROJECT_DIR=$PROJECT_DIR" \
-    -e "KANNICH_HOST_CACHE_DIR=$KANNICH_CACHE_DIR" \
+    -e "KANNICH_HOST_PROJECT_DIR=$PROJECT_DOCKER_PATH" \
+    -e "KANNICH_HOST_CACHE_DIR=$CACHE_DOCKER_PATH" \
     -w /workspace \
     "$KANNICH_IMAGE" \
     java -jar /kannich/kannich-cli.jar "$@"
