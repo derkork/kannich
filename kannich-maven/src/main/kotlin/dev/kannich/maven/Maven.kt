@@ -78,12 +78,17 @@ class Maven(version: String, private val java: Java) : BaseTool(version) {
     override fun doExec(ctx: JobExecutionContext, vararg args: String): ExecResult {
         val homeDir = home(ctx)
         val javaHome = java.home(ctx)
-        val cmd = listOf("$homeDir/bin/mvn") + args.toList()
         val env = mapOf(
             "JAVA_HOME" to javaHome,
             "MAVEN_HOME" to homeDir,
             "M2_HOME" to homeDir
         )
+
+        // Cache the downloaded jar files.
+        val repositoryCacheKey = "$CACHE_KEY/repository"
+        cache.ensureDir(repositoryCacheKey)
+
+        val cmd = listOf("$homeDir/bin/mvn", "-Dmaven.repo.local=${cache.path(repositoryCacheKey)}") + args.toList()
         return ctx.executor.exec(cmd, ctx.workingDir, env, false)
     }
 

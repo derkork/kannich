@@ -45,20 +45,6 @@ class CacheTool {
     }
 
     /**
-     * Moves a file or directory into the cache.
-     *
-     * @param sourcePath The source path to move from
-     * @param key The cache key to move to
-     * @throws dev.kannich.stdlib.JobFailedException if the move fails
-     */
-    fun put(sourcePath: String, key: String) {
-        val cachePath = path(key)
-        val parentDir = cachePath.substringBeforeLast('/')
-        fs.mkdir(parentDir)
-        fs.move(sourcePath, cachePath)
-    }
-
-    /**
      * Clears a specific cache key or the entire cache.
      *
      * @param key The cache key to clear, or null to clear the entire cache
