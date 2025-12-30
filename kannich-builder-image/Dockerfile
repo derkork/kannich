@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     ca-certificates \
-    gnupg \
+    # GPG for code signing
+    gnupg2 \
     # Build essentials
     build-essential \
     # File system utilities for overlay support

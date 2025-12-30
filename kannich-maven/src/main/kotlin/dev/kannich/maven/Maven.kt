@@ -1,13 +1,55 @@
 package dev.kannich.maven
 
 import dev.kannich.jvm.Java
-import dev.kannich.stdlib.BaseTool
+import dev.kannich.stdlib.JobScope
+import dev.kannich.stdlib.KannichDsl
+import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.CacheTool
 import dev.kannich.stdlib.tools.ExtractTool
-import dev.kannich.stdlib.context.ExecResult
+import dev.kannich.stdlib.tools.FsTool
+import dev.kannich.stdlib.tools.ShellTool
 import dev.kannich.stdlib.context.JobExecutionContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
+/**
+ * Configuration for a Maven server (used in settings.xml).
+ */
+data class ServerConfig(
+    val id: String,
+    val username: String,
+    val password: String
+)
+
+/**
+ * DSL builder for configuring a Maven server.
+ */
+@KannichDsl
+class ServerBuilder(private val id: String) {
+    var username: String = ""
+    var password: String = ""
+
+    internal fun build() = ServerConfig(id, username, password)
+}
+
+/**
+ * DSL builder for configuring Maven.
+ */
+@KannichDsl
+class MavenBuilder {
+    internal val servers = mutableListOf<ServerConfig>()
+
+    /**
+     * Configures a server for authentication.
+     * The server id should match the id in your pom.xml distributionManagement section.
+     *
+     * @param id The server id
+     * @param block Configuration block for the server
+     */
+    fun server(id: String, block: ServerBuilder.() -> Unit) {
+        servers.add(ServerBuilder(id).apply(block).build())
+    }
+}
 
 /**
  * Provides Maven build support for Kannich pipelines.
@@ -24,11 +66,37 @@ import org.slf4j.LoggerFactory
  *     }
  * }
  * ```
+ *
+ * With server configuration:
+ * ```kotlin
+ * pipeline {
+ *     val java = Java("21")
+ *     val maven = Maven("3.9.6", java) {
+ *         server("ossrh") {
+ *             username = getenv("CI_USERNAME") ?: ""
+ *             password = getenv("CI_PASSWORD") ?: ""
+ *         }
+ *     }
+ *
+ *     val deploy = job("Deploy") {
+ *         maven.exec("deploy")
+ *     }
+ * }
+ * ```
  */
-class Maven(version: String, private val java: Java) : BaseTool(version) {
+class Maven(
+    val version: String,
+    private val java: Java,
+    block: MavenBuilder.() -> Unit = {}
+) {
+    private val config = MavenBuilder().apply(block)
+    private val servers = config.servers
+
     private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
     private val cache = CacheTool()
     private val extract = ExtractTool()
+    private val fs = FsTool()
+    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "maven"
@@ -36,18 +104,17 @@ class Maven(version: String, private val java: Java) : BaseTool(version) {
 
     /**
      * Gets the Maven home directory path inside the container.
-     * The path is computed based on the context's cache directory.
      */
-    override fun home(ctx: JobExecutionContext): String =
+    fun home(): String =
         cache.path("$CACHE_KEY/apache-maven-$version")
 
     /**
      * Ensures Maven is installed in the cache.
      * Also ensures Java is installed first since Maven depends on it.
      */
-    override fun ensureInstalled(ctx: JobExecutionContext) {
+    fun ensureInstalled() {
         // Ensure Java is installed first
-        java.ensureInstalled(ctx)
+        java.ensureInstalled()
 
         val cacheKey = "$CACHE_KEY/apache-maven-$version"
 
@@ -75,21 +142,89 @@ class Maven(version: String, private val java: Java) : BaseTool(version) {
         logger.info("Successfully installed Maven $version.")
     }
 
-    override fun doExec(ctx: JobExecutionContext, vararg args: String): ExecResult {
-        val homeDir = home(ctx)
-        val javaHome = java.home(ctx)
+    /**
+     * Executes Maven with the given arguments.
+     * Throws JobFailedException if the execution fails.
+     *
+     * @param args Arguments to pass to Maven
+     * @throws dev.kannich.stdlib.JobFailedException if the command fails
+     */
+    fun exec(vararg args: String) {
+        ensureInstalled()
+
+        val homeDir = home()
+        val javaHome = java.home()
         val env = mapOf(
             "JAVA_HOME" to javaHome,
             "MAVEN_HOME" to homeDir,
             "M2_HOME" to homeDir
         )
 
+        // Build command with settings.xml if servers are configured
+        val settingsArgs = if (servers.isNotEmpty()) {
+            val settingsPath = generateSettingsXml()
+            // Register cleanup to delete settings.xml when job completes
+            JobScope.current().onCleanup {
+                fs.delete(settingsPath)
+            }
+            listOf("-s", settingsPath)
+        } else {
+            emptyList()
+        }
+
         // Cache the downloaded jar files.
         val repositoryCacheKey = "$CACHE_KEY/repository"
         cache.ensureDir(repositoryCacheKey)
 
-        val cmd = listOf("$homeDir/bin/mvn", "-Dmaven.repo.local=${cache.path(repositoryCacheKey)}") + args.toList()
-        return ctx.executor.exec(cmd, ctx.workingDir, env, false)
+        val allArgs = listOf("-Dmaven.repo.local=${cache.path(repositoryCacheKey)}") +
+                      settingsArgs + args.toList()
+        val result = shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), env = env)
+        if (!result.success) {
+            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
+            fail("Command failed: $errorMessage")
+        }
+    }
+
+    /**
+     * Generates a settings.xml file with server credentials.
+     * Returns the path to the generated file.
+     */
+    private fun generateSettingsXml(): String {
+        val ctx = JobExecutionContext.current()
+        val settingsPath = "${ctx.workingDir}/.kannich/settings.xml"
+
+        val xml = buildString {
+            appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
+            appendLine("""<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">""")
+            appendLine("  <servers>")
+            for (server in servers) {
+                appendLine("    <server>")
+                appendLine("      <id>${escapeXml(server.id)}</id>")
+                appendLine("      <username>${escapeXml(server.username)}</username>")
+                appendLine("      <password>${escapeXml(server.password)}</password>")
+                appendLine("    </server>")
+            }
+            appendLine("  </servers>")
+            appendLine("</settings>")
+        }
+
+        fs.write(settingsPath, xml)
+        return settingsPath
+    }
+
+    /**
+     * Escapes special XML characters.
+     */
+    private fun escapeXml(text: String): String {
+        return text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;")
     }
 
     /**

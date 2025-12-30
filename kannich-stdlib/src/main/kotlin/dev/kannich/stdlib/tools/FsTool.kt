@@ -147,4 +147,26 @@ class FsTool {
     fun isFile(path: String): Boolean {
         return shell.execShell("test -f '$path'").success
     }
+
+    /**
+     * Writes text content to a file.
+     * Creates parent directories if needed. Overwrites existing file.
+     *
+     * @param path The file path to write to
+     * @param content The text content to write
+     * @throws dev.kannich.stdlib.JobFailedException if write fails
+     */
+    fun write(path: String, content: String) {
+        // Ensure parent directory exists
+        val parent = path.substringBeforeLast('/', "")
+        if (parent.isNotEmpty()) {
+            mkdir(parent)
+        }
+        // Use base64 encoding to safely pass content through shell
+        val encoded = java.util.Base64.getEncoder().encodeToString(content.toByteArray())
+        val result = shell.execShell("echo '$encoded' | base64 -d > '$path'")
+        if (!result.success) {
+            fail("Failed to write to $path: ${result.stderr}")
+        }
+    }
 }

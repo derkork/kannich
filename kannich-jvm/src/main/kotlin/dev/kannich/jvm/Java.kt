@@ -1,11 +1,10 @@
 package dev.kannich.jvm
 
-import dev.kannich.stdlib.BaseTool
+import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.CacheTool
 import dev.kannich.stdlib.tools.ExtractTool
 import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.context.ExecResult
-import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.tools.ShellTool
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -23,11 +22,12 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Java(version: String) : BaseTool(version) {
+class Java(val version: String) {
     private val logger: Logger = LoggerFactory.getLogger(Java::class.java)
     private val cache = CacheTool()
     private val extract = ExtractTool()
     private val fs = FsTool()
+    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "java"
@@ -35,16 +35,15 @@ class Java(version: String) : BaseTool(version) {
 
     /**
      * Gets the Java home directory path inside the container.
-     * The path is computed based on the context's cache directory.
      */
-    override fun home(ctx: JobExecutionContext): String =
+    fun home(): String =
         cache.path("$CACHE_KEY/temurin-$version")
 
     /**
      * Ensures Java is installed in the cache.
      * Downloads from Adoptium (Eclipse Temurin) if not already present.
      */
-    override fun ensureInstalled(ctx: JobExecutionContext) {
+    fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/temurin-$version"
 
         if (cache.exists(cacheKey)) {
@@ -69,11 +68,22 @@ class Java(version: String) : BaseTool(version) {
         logger.info("Successfully installed Java $version.")
     }
 
-    override fun doExec(ctx: JobExecutionContext, vararg args: String): ExecResult {
-        val homeDir = home(ctx)
-        val cmd = listOf("$homeDir/bin/java") + args.toList()
+    /**
+     * Executes the Java command with the given arguments.
+     * Throws JobFailedException if the execution fails.
+     *
+     * @param args Arguments to pass to the java command
+     * @throws dev.kannich.stdlib.JobFailedException if the command fails
+     */
+    fun exec(vararg args: String) {
+        ensureInstalled()
+        val homeDir = home()
         val env = mapOf("JAVA_HOME" to homeDir)
-        return ctx.executor.exec(cmd, ctx.workingDir, env, false)
+        val result = shell.exec("$homeDir/bin/java", *args, env = env)
+        if (!result.success) {
+            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
+            fail("Command failed: $errorMessage")
+        }
     }
 
     /**

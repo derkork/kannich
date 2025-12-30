@@ -18,7 +18,8 @@
         <module>kannich-cli</module>
         <module>kannich-jvm</module>
         <module>kannich-maven</module>
-        <module>kannich-docker</module>
+        <module>kannich-gpg</module>
+        <module>kannich-trivy</module>
     </modules>
 
     <properties>
@@ -161,7 +162,12 @@
             </dependency>
             <dependency>
                 <groupId>dev.kannich</groupId>
-                <artifactId>kannich-docker</artifactId>
+                <artifactId>kannich-gpg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.kannich</groupId>
+                <artifactId>kannich-trivy</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

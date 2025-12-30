@@ -10,9 +10,9 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>kannich-docker</artifactId>
-    <name>Kannich Docker Plugin</name>
-    <description>Docker plugin for Kannich - Docker-in-Docker support</description>
+    <artifactId>kannich-gpg</artifactId>
+    <name>Kannich GPG Plugin</name>
+    <description>GPG plugin for Kannich - code signing key management</description>
 
     <dependencies>
         <!-- Kotlin -->
@@ -21,10 +21,15 @@
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
 
-        <!-- Core module -->
+        <!-- Stdlib for utilities and context -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-core</artifactId>
+            <artifactId>kannich-stdlib</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
         <!-- Testing -->

@@ -157,7 +157,6 @@ class ExecutionEngine(
         )
         val executor = ContainerCommandExecutor(containerManager, workDir)
         val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)
-        val jobScope = JobScope()
 
         // Execute job block with context
         var success = true
@@ -165,7 +164,7 @@ class ExecutionEngine(
 
         try {
             JobExecutionContext.withContext(jobCtx) {
-                job.block(jobScope)
+                JobScope.withScope { job.block(this) }
             }
         } catch (e: JobFailedException) {
             logger.warn("Job failed: ${e.message}")
