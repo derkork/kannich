@@ -16,8 +16,8 @@ import java.time.format.DateTimeFormatter
  * - INFO/DEBUG/TRACE: default color
  *
  * Pattern is controlled by the 'verbose' property:
- * - Normal: HH:mm:ss message
- * - Verbose: HH:mm:ss [ClassName] message
+ * - Normal: HH:mm:ss.SSS message
+ * - Verbose: HH:mm:ss.SSS [ClassName] message
  */
 class ColoredConsoleAppender : AppenderBase<ILoggingEvent>() {
 
