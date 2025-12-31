@@ -1,5 +1,6 @@
 package dev.kannich.stdlib
 
+import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.tools.*
 import org.slf4j.LoggerFactory
 
@@ -100,6 +101,49 @@ class JobScope private constructor() {
      */
     fun onCleanup(action: () -> Unit) {
         cleanupActions.add(action)
+    }
+
+    /**
+     * Changes the working directory for the duration of the block.
+     * The path is relative to the current working directory.
+     * After the block completes, the previous working directory is restored.
+     *
+     * Can be nested to navigate deeper into directory structures:
+     * ```
+     * cd("some/path") {
+     *     cd("nested") {
+     *         // Working in some/path/nested
+     *     }
+     *     // Back in some/path
+     * }
+     * ```
+     *
+     * @param path The relative path to change to
+     * @param block The block to execute in the new directory
+     * @return The result of the block
+     * @throws JobFailedException if the directory does not exist
+     */
+    fun <T> cd(path: String, block: () -> T): T {
+        val currentCtx = JobExecutionContext.current()
+        val newWorkingDir = "${currentCtx.workingDir}/$path"
+
+        // Check if directory exists before changing to it
+        val checkResult = currentCtx.executor.exec(
+            command = listOf("test", "-d", newWorkingDir),
+            workingDir = currentCtx.workingDir,
+            env = emptyMap(),
+            silent = true
+        )
+        if (!checkResult.success) {
+            fail("Directory '$path' does not exist (full path: $newWorkingDir)")
+        }
+
+        val newCtx = JobExecutionContext(
+            pipelineContext = currentCtx.pipelineContext,
+            executor = currentCtx.executor,
+            workingDir = newWorkingDir
+        )
+        return JobExecutionContext.withContext(newCtx, block)
     }
 
     /**
