@@ -20,23 +20,12 @@ class PipelineBuilder {
     /**
      * Defines a job with the given name and execution block.
      * The block is executed when the job runs, not during pipeline definition.
+     *
+     * Use `artifacts { }` within the job block to collect build artifacts.
      */
     fun job(name: String, block: JobScope.() -> Unit): Job {
         val builder = JobBuilder(name)
         builder.setBlock(block)
-        val job = builder.build()
-        jobs[name] = job
-        return job
-    }
-
-    /**
-     * Defines a job with artifacts specification.
-     * Use this when you need to collect artifacts after job execution.
-     */
-    fun job(name: String, artifacts: ArtifactSpecBuilder.() -> Unit, block: JobScope.() -> Unit): Job {
-        val builder = JobBuilder(name)
-        builder.setBlock(block)
-        builder.artifacts(artifacts)
         val job = builder.build()
         jobs[name] = job
         return job

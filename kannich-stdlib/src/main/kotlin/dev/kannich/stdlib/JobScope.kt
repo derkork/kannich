@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 class JobScope private constructor() {
     private val logger = LoggerFactory.getLogger(JobScope::class.java)
     private val cleanupActions = mutableListOf<() -> Unit>()
+    private val artifactSpecs = mutableListOf<ArtifactSpec>()
 
     /**
      * Shell tool for executing arbitrary commands.
@@ -51,6 +52,27 @@ class JobScope private constructor() {
      * Environment tool for reading and writing environment variables.
      */
     val env: EnvTool = EnvTool()
+
+    /**
+     * Collects artifacts matching the specified patterns.
+     * Can be called multiple times during job execution - all patterns are accumulated.
+     *
+     * Pattern syntax (ant-style):
+     * - `*` matches 0 or more characters except the directory separator (`/`)
+     * - `**` matches 0 or more characters including the directory separator (`/`)
+     * - `?` matches a single character
+     *
+     * Only files within the workspace directory can be collected as artifacts.
+     */
+    fun artifacts(block: ArtifactSpecBuilder.() -> Unit) {
+        val spec = ArtifactSpecBuilder().apply(block).build()
+        artifactSpecs.add(spec)
+    }
+
+    /**
+     * Returns all collected artifact specifications.
+     */
+    internal fun getArtifactSpecs(): List<ArtifactSpec> = artifactSpecs.toList()
 
     /**
      * Executes a block and catches any JobFailedException.
@@ -105,13 +127,16 @@ class JobScope private constructor() {
         /**
          * Executes a block with a new JobScope, ensuring cleanup runs on completion.
          * This is used by the execution engine to wrap job execution.
+         *
+         * @return A [JobScopeResult] containing the block's return value and collected artifacts
          */
-        fun <T> withScope(block: JobScope.() -> T): T {
+        fun <T> withScope(block: JobScope.() -> T): JobScopeResult<T> {
             val scope = JobScope()
             val prev = current.get()
             current.set(scope)
             return try {
-                scope.block()
+                val result = scope.block()
+                JobScopeResult(result, scope.getArtifactSpecs())
             } finally {
                 scope.runCleanup()
                 EnvTool.clearJobEnv()
@@ -120,6 +145,14 @@ class JobScope private constructor() {
         }
     }
 }
+
+/**
+ * Result from executing a job scope block, including collected artifacts.
+ */
+data class JobScopeResult<T>(
+    val result: T,
+    val artifacts: List<ArtifactSpec>
+)
 
 /**
  * DSL marker to prevent accidental nesting of DSL elements.

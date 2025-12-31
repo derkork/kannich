@@ -1,6 +1,7 @@
 package dev.kannich.core.execution
 
 import dev.kannich.core.docker.ContainerManager
+import dev.kannich.core.util.AntPathMatcher
 import dev.kannich.stdlib.ArtifactSpec
 import dev.kannich.stdlib.ExecutionReference
 import dev.kannich.stdlib.ExecutionStep
@@ -8,6 +9,7 @@ import dev.kannich.stdlib.Job
 import dev.kannich.stdlib.JobExecutionStep
 import dev.kannich.stdlib.JobFailedException
 import dev.kannich.stdlib.JobScope
+import dev.kannich.stdlib.JobScopeResult
 import dev.kannich.stdlib.ParallelSteps
 import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
@@ -162,11 +164,13 @@ class ExecutionEngine(
         // Execute job block with context
         var success = true
         var output = ""
+        var artifactSpecs: List<ArtifactSpec> = emptyList()
 
         try {
             timed("Job ${job.name}") {
                 JobExecutionContext.withContext(jobCtx) {
-                    JobScope.withScope { job.block(this) }
+                    val scopeResult = JobScope.withScope { job.block(this) }
+                    artifactSpecs = scopeResult.artifacts
                 }
             }
         } catch (e: JobFailedException) {
@@ -179,11 +183,12 @@ class ExecutionEngine(
             output = "Unexpected error: ${e.message}"
         }
 
-        // Collect artifacts if job succeeded
-        val artifacts = job.artifacts
-        if (success && artifacts != null) {
+        // Collect artifacts if job succeeded and artifacts were specified
+        if (success && artifactSpecs.isNotEmpty()) {
             timed("Collecting artifacts for ${job.name}") {
-                collectArtifacts(artifacts, workDir, layerId)
+                for (spec in artifactSpecs) {
+                    collectArtifacts(spec, workDir, layerId)
+                }
             }
         }
 
@@ -205,26 +210,50 @@ class ExecutionEngine(
         }
     }
 
+    /**
+     * Collects artifacts from the container matching the given specification.
+     *
+     * Uses ant-style glob pattern matching:
+     * - `*` matches 0 or more characters except `/`
+     * - `**` matches 0 or more characters including `/`
+     * - `?` matches exactly one character
+     *
+     * Only files within the workspace directory can be collected as artifacts.
+     */
     private fun collectArtifacts(spec: ArtifactSpec, workDir: String, layerId: String) {
-        for (pattern in spec.includes) {
-            // Use find to get matching files (silent - don't show find output to user)
-            val findResult = containerManager.execShell(
-                "find $workDir -path '$workDir/$pattern' -type f 2>/dev/null || true",
-                workingDir = workDir,
-                silent = true
-            )
+        // List all files recursively in the workspace (files and directories)
+        val findResult = containerManager.execShell(
+            "find $workDir \\( -type f -o -type d \\) 2>/dev/null || true",
+            workingDir = workDir,
+            silent = true
+        )
 
-            val files = findResult.stdout.lines().filter { it.isNotBlank() }
-            for (file in files) {
-                // Check exclusions
-                val relativePath = file.removePrefix("$workDir/")
-                if (spec.excludes.none { relativePath.matches(Regex(it.replace("**", ".*").replace("*", "[^/]*"))) }) {
-                    val destFile = File(artifactsDir, relativePath)
-                    destFile.parentFile?.mkdirs()
-                    containerManager.copyArtifacts(file, destFile.parentFile)
-                    logger.info("Collected artifact: $relativePath")
-                }
+        val allPaths = findResult.stdout.lines()
+            .filter { it.isNotBlank() && it != workDir }
+            .map { it.removePrefix("$workDir/") }
+
+        // Find paths matching include patterns but not exclude patterns
+        val matchingPaths = allPaths.filter { relativePath ->
+            val matchesInclude = AntPathMatcher.matchesAny(spec.includes, relativePath)
+            val matchesExclude = spec.excludes.isNotEmpty() &&
+                                 AntPathMatcher.matchesAny(spec.excludes, relativePath)
+            matchesInclude && !matchesExclude
+        }
+
+        // Copy matching artifacts
+        for (relativePath in matchingPaths) {
+            val containerPath = "$workDir/$relativePath"
+            val destFile = File(artifactsDir, relativePath)
+
+            // Security check: ensure destination is within artifacts dir
+            if (!destFile.canonicalPath.startsWith(artifactsDir.canonicalPath)) {
+                logger.warn("Skipping artifact outside workspace: $relativePath")
+                continue
             }
+
+            destFile.parentFile?.mkdirs()
+            containerManager.copyArtifacts(containerPath, destFile.parentFile)
+            logger.info("Collected artifact: $relativePath")
         }
     }
 }

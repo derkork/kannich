@@ -19,12 +19,21 @@ pipeline {
         maven.exec("-B", "compile")
     }
 
-    val test = job("Test", { include("**/target/surefire-reports/**") }) {
+    val test = job("Test") {
         maven.exec("-B", "test")
+
+        artifacts {
+            includes("**/target/surefire-reports/**")
+        }
     }
 
-    val packageJar = job("Package", { include("**/target/**/*.jar") }) {
+    val packageJar = job("Package") {
         maven.exec("-B", "package", "-DskipTests")
+
+        artifacts {
+            includes("**/target/*.jar")
+            excludes("**/target/*-sources.jar")
+        }
     }
 
     execution("fail") {
