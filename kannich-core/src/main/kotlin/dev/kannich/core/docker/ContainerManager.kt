@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import dev.kannich.stdlib.context.ExecResult
 import java.io.Closeable
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -141,13 +142,55 @@ class ContainerManager(
         return exec(listOf("sh", "-c", command), workingDir, env, silent)
     }
 
+
     /**
-     * Copies artifacts from the container to the host.
+     * Copies multiple artifacts from the container to the host in a single tar operation.
+     * This is more efficient than copying files one by one.
+     *
+     * Creates a staging directory with hard links to the artifacts, copies it using
+     * Docker's copy API (which creates a tar), and extracts directly to the host.
+     *
+     * @param workDir The working directory in the container (base for relative paths)
+     * @param relativePaths List of paths relative to workDir to include in the archive
+     * @param hostDir The destination directory on the host
      */
-    fun copyArtifacts(containerPath: String, hostDir: File) {
+    fun copyArtifacts(workDir: String, relativePaths: List<String>, hostDir: File) {
+        if (relativePaths.isEmpty()) {
+            return
+        }
+
         val containerId = checkInitialized()
-        logger.info("Copying artifacts from $containerPath to ${hostDir.absolutePath}")
-        client.copyFromContainer(containerId, containerPath, hostDir)
+        logger.info("Copying ${relativePaths.size} artifacts from $workDir to ${hostDir.absolutePath}")
+
+        // Create a staging directory with the artifact structure using hard links
+        // This avoids copying file contents twice
+        val stagingDir = "/tmp/artifacts-${System.currentTimeMillis()}"
+        val fileListContent = relativePaths.joinToString("\n")
+
+        // Create staging directory and link all artifacts into it
+        val setupResult = execShell(
+            "mkdir -p $stagingDir && cd $workDir && " +
+            """while IFS= read -r f; do if [ -n "${'$'}f" ]; then d=${'$'}(dirname "${'$'}f"); mkdir -p "$stagingDir/${'$'}d"; if [ -f "${'$'}f" ]; then ln "${'$'}f" "$stagingDir/${'$'}f" 2>/dev/null || cp "${'$'}f" "$stagingDir/${'$'}f"; elif [ -d "${'$'}f" ]; then mkdir -p "$stagingDir/${'$'}f"; fi; fi; done << 'ARTIFACT_EOF'
+$fileListContent
+ARTIFACT_EOF""",
+            silent = true
+        )
+
+        if (!setupResult.success) {
+            logger.warn("Failed to stage artifacts: ${setupResult.stderr}")
+            execShell("rm -rf $stagingDir", silent = true)
+            return
+        }
+
+        try {
+            // Copy the staging directory - Docker will tar it and we extract to host
+            // The staging dir contents will be extracted directly into hostDir
+            client.copyFromContainer(containerId, "$stagingDir/.", hostDir)
+            logger.info("Artifacts copied successfully")
+        } finally {
+            // Clean up the staging directory
+            execShell("rm -rf $stagingDir", silent = true)
+        }
     }
 
     /**
@@ -159,7 +202,7 @@ class ContainerManager(
     fun createJobLayer(parentLayerId: String? = null): String {
         checkInitialized() // Just validate, don't need the ID here
 
-        val layerId = "layer-${System.currentTimeMillis()}"
+        val layerId = "layer-${UUID.randomUUID().toString().replace("-", "")}"
         val layerDir = "/kannich/overlays/$layerId"
         val sourceDir = if (parentLayerId != null) {
             getLayerWorkDir(parentLayerId)

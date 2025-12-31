@@ -33,6 +33,7 @@ pipeline {
         artifacts {
             includes("**/target/*.jar")
             excludes("**/target/*-sources.jar")
+            excludes("**/target/original-*.jar")
         }
     }
 

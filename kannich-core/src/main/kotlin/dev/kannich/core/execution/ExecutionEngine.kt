@@ -9,7 +9,6 @@ import dev.kannich.stdlib.Job
 import dev.kannich.stdlib.JobExecutionStep
 import dev.kannich.stdlib.JobFailedException
 import dev.kannich.stdlib.JobScope
-import dev.kannich.stdlib.JobScopeResult
 import dev.kannich.stdlib.ParallelSteps
 import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
@@ -185,10 +184,14 @@ class ExecutionEngine(
 
         // Collect artifacts if job succeeded and artifacts were specified
         if (success && artifactSpecs.isNotEmpty()) {
-            timed("Collecting artifacts for ${job.name}") {
-                for (spec in artifactSpecs) {
-                    collectArtifacts(spec, workDir, layerId)
+            try {
+                timed("Collecting artifacts for ${job.name}") {
+                    for (spec in artifactSpecs) {
+                        collectArtifacts(spec, workDir, layerId)
+                    }
                 }
+            } catch (e: Exception) {
+                logger.error("Failed to collect artifacts: ${e.message}", e)
             }
         }
 
@@ -219,6 +222,7 @@ class ExecutionEngine(
      * - `?` matches exactly one character
      *
      * Only files within the workspace directory can be collected as artifacts.
+     * All matching artifacts are copied in a single tar operation for efficiency.
      */
     private fun collectArtifacts(spec: ArtifactSpec, workDir: String, layerId: String) {
         // List all files recursively in the workspace (files and directories)
@@ -228,9 +232,11 @@ class ExecutionEngine(
             silent = true
         )
 
-        val allPaths = findResult.stdout.lines()
+        val rawLines = findResult.stdout.lines()
+        val allPaths = rawLines
             .filter { it.isNotBlank() && it != workDir }
             .map { it.removePrefix("$workDir/") }
+
 
         // Find paths matching include patterns but not exclude patterns
         val matchingPaths = allPaths.filter { relativePath ->
@@ -240,21 +246,32 @@ class ExecutionEngine(
             matchesInclude && !matchesExclude
         }
 
-        // Copy matching artifacts
-        for (relativePath in matchingPaths) {
-            val containerPath = "$workDir/$relativePath"
-            val destFile = File(artifactsDir, relativePath)
-
-            // Security check: ensure destination is within artifacts dir
-            if (!destFile.canonicalPath.startsWith(artifactsDir.canonicalPath)) {
-                logger.warn("Skipping artifact outside workspace: $relativePath")
-                continue
-            }
-
-            destFile.parentFile?.mkdirs()
-            containerManager.copyArtifacts(containerPath, destFile.parentFile)
-            logger.info("Collected artifact: $relativePath")
+        if (matchingPaths.isEmpty()) {
+            logger.info("No artifacts matched the patterns")
+            return
         }
+
+        // Security check: ensure all destinations are within artifacts dir
+        val safePaths = matchingPaths.filter { relativePath ->
+            val destFile = File(artifactsDir, relativePath)
+            val isSafe = destFile.canonicalPath.startsWith(artifactsDir.canonicalPath)
+            if (!isSafe) {
+                logger.warn("Skipping artifact outside workspace: $relativePath")
+            }
+            isSafe
+        }
+
+        if (safePaths.isEmpty()) {
+            return
+        }
+
+        // Log matched artifacts
+        for (path in safePaths) {
+            logger.info("Matched artifact: $path")
+        }
+
+        // Copy all artifacts
+        containerManager.copyArtifacts(workDir, safePaths, artifactsDir)
     }
 }
 
