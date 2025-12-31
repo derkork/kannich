@@ -99,11 +99,20 @@ class KannichDockerClient(
         logger.info("Mounting project: $projectPath -> $workingDir")
         logger.info("Mounting cache: $cachePath -> /kannich/cache")
 
+        // Build list of bind mounts
+        val binds = mutableListOf(
+            Bind(projectPath, projectVolume),
+            Bind(cachePath, cacheVolume)
+        )
+
+        // Add Docker socket mount if needed (for nested container support)
+        getDockerSocketMount()?.let { socketPath ->
+            logger.info("Mounting Docker socket: $socketPath")
+            binds.add(Bind(socketPath, Volume(socketPath)))
+        }
+
         val hostConfig = HostConfig.newHostConfig()
-            .withBinds(
-                Bind(projectPath, projectVolume),
-                Bind(cachePath, cacheVolume)
-            )
+            .withBinds(binds)
             .withAutoRemove(false) // We'll manage cleanup ourselves
 
         val container = dockerClient.createContainerCmd(builderImage)
@@ -231,6 +240,39 @@ class KannichDockerClient(
 
     override fun close() {
         dockerClient.close()
+    }
+
+    /**
+     * Determines the Docker socket path to mount for nested container support.
+     * Returns null if using TCP (no mount needed) or the socket path to mount.
+     *
+     * Logic mirrors kannichw wrapper script:
+     * - DOCKER_HOST=unix:///path -> mount that path
+     * - DOCKER_HOST=tcp://... -> no mount needed (env var handles it)
+     * - No DOCKER_HOST -> mount default /var/run/docker.sock
+     */
+    private fun getDockerSocketMount(): String? {
+        val dockerHost = System.getenv("DOCKER_HOST")
+
+        return when {
+            dockerHost == null || dockerHost.isBlank() -> {
+                // No DOCKER_HOST set, use default socket
+                "/var/run/docker.sock"
+            }
+            dockerHost.startsWith("unix://") -> {
+                // Extract socket path from unix:///path/to/socket
+                dockerHost.removePrefix("unix://")
+            }
+            dockerHost.startsWith("tcp://") -> {
+                // TCP connection - no socket mount needed
+                null
+            }
+            else -> {
+                // Unknown format, try default socket
+                logger.warn("Unknown DOCKER_HOST format: $dockerHost, using default socket")
+                "/var/run/docker.sock"
+            }
+        }
     }
 
     /**
