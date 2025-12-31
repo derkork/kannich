@@ -13,6 +13,7 @@ import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
 import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.context.PipelineContext
+import dev.kannich.stdlib.timed
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -163,8 +164,10 @@ class ExecutionEngine(
         var output = ""
 
         try {
-            JobExecutionContext.withContext(jobCtx) {
-                JobScope.withScope { job.block(this) }
+            timed("Job ${job.name}") {
+                JobExecutionContext.withContext(jobCtx) {
+                    JobScope.withScope { job.block(this) }
+                }
             }
         } catch (e: JobFailedException) {
             logger.warn("Job failed: ${e.message}")
@@ -179,7 +182,9 @@ class ExecutionEngine(
         // Collect artifacts if job succeeded
         val artifacts = job.artifacts
         if (success && artifacts != null) {
-            collectArtifacts(artifacts, workDir, layerId)
+            timed("Collecting artifacts for ${job.name}") {
+                collectArtifacts(artifacts, workDir, layerId)
+            }
         }
 
         val result = JobResult(
