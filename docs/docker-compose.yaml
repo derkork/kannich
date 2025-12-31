@@ -1,0 +1,9 @@
+services:
+  site:
+    container_name: docsy
+    command: jekyll serve --force_polling --drafts
+    image: jekyll/jekyll:4.2.2
+    volumes: 
+      - "./:/srv/jekyll"
+    ports: 
+      - "4000:4000"

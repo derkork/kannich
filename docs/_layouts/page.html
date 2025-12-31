@@ -1,0 +1,11 @@
+---
+layout: default
+---
+{% unless page.no_toc  %}
+<h1>{{ page.title }}</h1>
+<h2>Table of contents</h2>
+{% include toc.html html=content %}
+{% endunless %}
+{{ content }}
+{% include permalinks.html %}
+{% include tags.html %}
