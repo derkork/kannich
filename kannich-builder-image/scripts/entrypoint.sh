@@ -18,4 +18,4 @@ if [ $# -gt 0 ]; then
 fi
 
 # Otherwise keep container running (for exec-based job execution)
-exec tail -f /dev/null
+exec sleep infinity

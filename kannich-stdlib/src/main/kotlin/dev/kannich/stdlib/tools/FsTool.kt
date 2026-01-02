@@ -1,6 +1,10 @@
-﻿package dev.kannich.stdlib.tools
+package dev.kannich.stdlib.tools
 
+import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.fail
+import dev.kannich.stdlib.util.AntPathMatcher
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 /**
  * Built-in tool for filesystem operations.
@@ -150,23 +154,119 @@ class FsTool {
 
     /**
      * Writes text content to a file.
-     * Creates parent directories if needed. Overwrites existing file.
+     * Creates parent directories if needed. Overwrites an existing file.
+     * Uses Docker's copy API for reliable handling of large content.
      *
      * @param path The file path to write to
      * @param content The text content to write
+     * @param append If true, appends content to the file instead of overwriting
      * @throws dev.kannich.stdlib.JobFailedException if write fails
      */
-    fun write(path: String, content: String) {
+    fun write(path: String, content: String, append: Boolean = false) {
+        write(path, ByteArrayInputStream(content.toByteArray()), append)
+    }
+
+    /**
+     * Writes binary content from an input stream to a file.
+     * Creates parent directories if needed. Overwrites an existing file.
+     * Uses Docker's copy API for reliable streaming of large files.
+     *
+     * @param path The file path to write to (relative to working directory, or absolute)
+     * @param content The input stream to read content from
+     * @param append If true, appends content to the file instead of overwriting
+     * @throws dev.kannich.stdlib.JobFailedException if write fails
+     */
+    fun write(path: String, content: InputStream, append: Boolean = false) {
         // Ensure parent directory exists
         val parent = path.substringBeforeLast('/', "")
         if (parent.isNotEmpty()) {
             mkdir(parent)
         }
-        // Use base64 encoding to safely pass content through shell
-        val encoded = java.util.Base64.getEncoder().encodeToString(content.toByteArray())
-        val result = shell.execShell("echo '$encoded' | base64 -d > '$path'")
-        if (!result.success) {
-            fail("Failed to write to $path: ${result.stderr}")
+        val ctx = JobExecutionContext.current()
+        // Make path absolute if it's relative
+        val absolutePath = if (path.startsWith("/")) path else "${ctx.workingDir}/$path"
+        ctx.executor.writeFile(absolutePath, content, append)
+    }
+
+    /**
+     * Finds files matching ant-style glob patterns.
+     *
+     * Pattern syntax:
+     * - [*] matches 0 or more characters except [/]
+     * - [**] matches 0 or more characters including [/]
+     * - [?] matches exactly one character
+     *
+     * Examples: target/&#42;&#42;/&#42;.jar, src/main/resources/&#42;.xml, foo.txt
+     *
+     * @param includes Patterns for files to include
+     * @param excludes Patterns for files to exclude (default: empty)
+     * @param baseDir Base directory to search from (default: current working directory)
+     * @return List of relative paths matching the patterns
+     */
+    fun glob(
+        includes: List<String>,
+        excludes: List<String> = emptyList(),
+        baseDir: String? = null
+    ): List<String> {
+        val workDir = baseDir ?: "."
+        val matchingPaths = mutableListOf<String>()
+
+        // Separate literal paths from patterns with wildcards
+        val (literalPaths, patterns) = includes.partition { AntPathMatcher.isLiteralPath(it) }
+
+        // For literal paths, just check if they exist (no find needed)
+        for (path in literalPaths) {
+            val fullPath = if (workDir == ".") path else "$workDir/$path"
+            if (shell.execShell("test -e '$fullPath'", silent = true).success) {
+                val matchesExclude = excludes.isNotEmpty() &&
+                                     AntPathMatcher.matchesAny(excludes, path)
+                if (!matchesExclude) {
+                    matchingPaths.add(path)
+                }
+            }
         }
+
+        // For patterns with wildcards, use find with base path optimization
+        if (patterns.isNotEmpty()) {
+            val basePaths = AntPathMatcher.getBasePaths(patterns)
+
+            val findCommand = if (basePaths.isEmpty() || basePaths.contains("")) {
+                "find '$workDir' \\( -type f -o -type d \\) 2>/dev/null || true"
+            } else {
+                val paths = basePaths.joinToString(" ") {
+                    if (workDir == ".") "'$it'" else "'$workDir/$it'"
+                }
+                "find $paths \\( -type f -o -type d \\) 2>/dev/null || true"
+            }
+
+            val findResult = shell.execShell(findCommand, silent = true)
+            val prefix = if (workDir == ".") "./" else "$workDir/"
+
+            val allPaths = findResult.stdout.lines()
+                .filter { it.isNotBlank() && it != workDir && it != "." }
+                .map { it.removePrefix(prefix) }
+
+            for (relativePath in allPaths) {
+                val matchesInclude = AntPathMatcher.matchesAny(patterns, relativePath)
+                val matchesExclude = excludes.isNotEmpty() &&
+                                     AntPathMatcher.matchesAny(excludes, relativePath)
+                if (matchesInclude && !matchesExclude) {
+                    matchingPaths.add(relativePath)
+                }
+            }
+        }
+
+        return matchingPaths
+    }
+
+    /**
+     * Finds files matching a single ant-style glob pattern.
+     *
+     * @param pattern The pattern to match
+     * @param baseDir Base directory to search from (default: current working directory)
+     * @return List of relative paths matching the pattern
+     */
+    fun glob(pattern: String, baseDir: String? = null): List<String> {
+        return glob(listOf(pattern), emptyList(), baseDir)
     }
 }
