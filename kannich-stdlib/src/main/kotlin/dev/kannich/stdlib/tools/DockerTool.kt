@@ -2,6 +2,7 @@ package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.fail
+import dev.kannich.stdlib.secret
 
 /**
  * Tool for executing Docker commands.
@@ -32,6 +33,33 @@ class DockerTool {
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Docker command failed: $errorMessage")
+        }
+        return result
+    }
+
+    /**
+     * Logs into a Docker registry.
+     * Password is passed securely via stdin and marked as secret.
+     *
+     * @param username The registry username
+     * @param password The registry password (will be masked in logs)
+     * @param registry The registry URL (defaults to Docker Hub if null)
+     * @return The execution result
+     * @throws dev.kannich.stdlib.JobFailedException if login fails
+     */
+    fun login(username: String, password: String, registry: String? = null): ExecResult {
+        secret(password)
+
+        val registryArg = registry ?: ""
+        val result = shell.execShell(
+            "echo \"\$DOCKER_PASSWORD\" | docker login -u \"$username\" --password-stdin $registryArg".trim(),
+            env = mapOf("DOCKER_PASSWORD" to password),
+            silent = true
+        )
+
+        if (!result.success) {
+            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
+            fail("Docker login failed: $errorMessage")
         }
         return result
     }

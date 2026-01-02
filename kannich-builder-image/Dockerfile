@@ -18,8 +18,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     # GPG for code signing
     gnupg2 \
-    # Build essentials
-    build-essential \
     # File system utilities for overlay support
     fuse-overlayfs \
     rsync \
@@ -30,19 +28,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     # Text processing
     jq \
+    yq \
     # Network tools
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker CLI (client only, for interfacing with external Docker daemon)
-RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.4.1.tgz -o /tmp/docker.tgz \
+RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-29.1.3.tgz -o /tmp/docker.tgz \
     && tar -xzf /tmp/docker.tgz -C /tmp \
     && mv /tmp/docker/docker /usr/local/bin/ \
     && rm -rf /tmp/docker /tmp/docker.tgz \
-    # Install Docker Compose plugin
+    # Install Docker CLI plugins
     && mkdir -p /usr/local/lib/docker/cli-plugins \
-    && curl -fsSL https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose \
-    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    && curl -fsSL https://github.com/docker/compose/releases/download/v5.0.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose \
+    && curl -fsSL https://github.com/docker/buildx/releases/download/v0.30.1/buildx-v0.30.1.linux-amd64 -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-buildx
 
 # Install Eclipse Temurin JDK 21 to private path (not in global PATH)
 # This allows build pipelines to install their own Java without conflicts
