@@ -53,6 +53,11 @@
             <artifactId>kannich-trivy</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-helm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

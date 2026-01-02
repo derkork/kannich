@@ -20,6 +20,7 @@
         <module>kannich-maven</module>
         <module>kannich-gpg</module>
         <module>kannich-trivy</module>
+        <module>kannich-helm</module>
     </modules>
 
     <properties>
@@ -168,6 +169,11 @@
             <dependency>
                 <groupId>dev.kannich</groupId>
                 <artifactId>kannich-trivy</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.kannich</groupId>
+                <artifactId>kannich-helm</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
