@@ -369,6 +369,6 @@ class KannichDockerClient(
     }
 
     companion object {
-        const val DEFAULT_BUILDER_IMAGE = "kannich/builder:latest"
+        const val DEFAULT_BUILDER_IMAGE = "derkork/kannich:latest"
     }
 }

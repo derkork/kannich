@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 
 REM Configuration
 if "%KANNICH_VERSION%"=="" set KANNICH_VERSION=latest
-set KANNICH_IMAGE=kannich/builder:%KANNICH_VERSION%
+set KANNICH_IMAGE=derkork/kannich:%KANNICH_VERSION%
 if "%KANNICH_CACHE_DIR%"=="" set KANNICH_CACHE_DIR=%USERPROFILE%\.kannich\cache
 
 REM Default prefixes for environment variables to pass to Docker

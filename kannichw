@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 KANNICH_VERSION="${KANNICH_VERSION:-latest}"
-KANNICH_IMAGE="kannich/builder:${KANNICH_VERSION}"
+KANNICH_IMAGE="derkork/kannich:${KANNICH_VERSION}"
 KANNICH_CACHE_DIR="${KANNICH_CACHE_DIR:-$HOME/.kannich/cache}"
 
 # Default prefixes for environment variables to pass to Docker

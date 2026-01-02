@@ -48,6 +48,15 @@ pipeline {
         }
     }
 
+    execution("deploy") {
+        job("deploy") {
+            if (!env.get)
+
+            // build jars and
+            maven.exec("-B", "-Pbootstrap", "install")
+        }
+    }
+
 
     execution("test") {
         job(packageJar)

@@ -138,7 +138,7 @@
                             <arguments>
                                 <argument>build</argument>
                                 <argument>-t</argument>
-                                <argument>kannich/builder:latest</argument>
+                                <argument>derkork/kannich:latest</argument>
                                 <argument>.</argument>
                             </arguments>
                         </configuration>
