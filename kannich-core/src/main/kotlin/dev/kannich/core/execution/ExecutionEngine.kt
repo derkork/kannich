@@ -1,7 +1,6 @@
 package dev.kannich.core.execution
 
 import dev.kannich.core.docker.ContainerManager
-import dev.kannich.core.util.AntPathMatcher
 import dev.kannich.stdlib.ArtifactSpec
 import dev.kannich.stdlib.ExecutionReference
 import dev.kannich.stdlib.ExecutionStep
@@ -16,6 +15,7 @@ import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.context.PipelineContext
 import dev.kannich.stdlib.timed
 import dev.kannich.stdlib.tools.EnvTool
+import dev.kannich.stdlib.tools.FsTool
 import dev.kannich.stdlib.tools.JobEnvContext
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -178,7 +178,6 @@ class ExecutionEngine(
         // Execute job block with context
         var success = true
         var output = ""
-        var artifactSpecs: List<ArtifactSpec> = emptyList()
 
         try {
             timed("Job ${job.name}") {
@@ -187,7 +186,15 @@ class ExecutionEngine(
                 runBlocking(coroutineContext) {
                     JobExecutionContext.withContext(jobCtx) {
                         val scopeResult = JobScope.withScope { job.block(this) }
-                        artifactSpecs = scopeResult.artifacts
+
+                        // Collect artifacts while still in context (so FsTool works)
+                        if (scopeResult.artifacts.isNotEmpty()) {
+                            timed("Collecting artifacts") {
+                                for (spec in scopeResult.artifacts) {
+                                    collectArtifacts(spec, workDir)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -199,19 +206,6 @@ class ExecutionEngine(
             logger.error("Unexpected error in job: ${e.message}", e)
             success = false
             output = "Unexpected error: ${e.message}"
-        }
-
-        // Collect artifacts if job succeeded and artifacts were specified
-        if (success && artifactSpecs.isNotEmpty()) {
-            try {
-                timed("Collecting artifacts for ${job.name}") {
-                    for (spec in artifactSpecs) {
-                        collectArtifacts(spec, workDir, layerId)
-                    }
-                }
-            } catch (e: Exception) {
-                logger.error("Failed to collect artifacts: ${e.message}", e)
-            }
         }
 
         val result = JobResult(
@@ -234,36 +228,11 @@ class ExecutionEngine(
 
     /**
      * Collects artifacts from the container matching the given specification.
-     *
-     * Uses ant-style glob pattern matching:
-     * - `*` matches 0 or more characters except `/`
-     * - `**` matches 0 or more characters including `/`
-     * - `?` matches exactly one character
-     *
-     * Only files within the workspace directory can be collected as artifacts.
-     * All matching artifacts are copied in a single tar operation for efficiency.
+     * Uses FsTool.glob() for pattern matching (runs within JobExecutionContext).
      */
-    private fun collectArtifacts(spec: ArtifactSpec, workDir: String, layerId: String) {
-        // List all files recursively in the workspace (files and directories)
-        val findResult = containerManager.execShell(
-            "find $workDir \\( -type f -o -type d \\) 2>/dev/null || true",
-            workingDir = workDir,
-            silent = true
-        )
-
-        val rawLines = findResult.stdout.lines()
-        val allPaths = rawLines
-            .filter { it.isNotBlank() && it != workDir }
-            .map { it.removePrefix("$workDir/") }
-
-
-        // Find paths matching include patterns but not exclude patterns
-        val matchingPaths = allPaths.filter { relativePath ->
-            val matchesInclude = AntPathMatcher.matchesAny(spec.includes, relativePath)
-            val matchesExclude = spec.excludes.isNotEmpty() &&
-                                 AntPathMatcher.matchesAny(spec.excludes, relativePath)
-            matchesInclude && !matchesExclude
-        }
+    private fun collectArtifacts(spec: ArtifactSpec, workDir: String) {
+        val fs = FsTool()
+        val matchingPaths = fs.glob(spec.includes, spec.excludes, workDir)
 
         if (matchingPaths.isEmpty()) {
             logger.info("No artifacts matched the patterns")

@@ -2,6 +2,8 @@ package dev.kannich.core.docker
 
 import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.api.model.Bind
+import com.github.dockerjava.api.model.Capability
+import com.github.dockerjava.api.model.Device
 import com.github.dockerjava.api.model.HostConfig
 import com.github.dockerjava.api.model.Volume
 import com.github.dockerjava.core.DefaultDockerClientConfig
@@ -9,8 +11,13 @@ import com.github.dockerjava.core.DockerClientImpl
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
 import org.slf4j.LoggerFactory
 import dev.kannich.stdlib.context.ExecResult
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
+import java.io.InputStream
 import java.time.Duration
 
 /**
@@ -114,6 +121,9 @@ class KannichDockerClient(
         val hostConfig = HostConfig.newHostConfig()
             .withBinds(binds)
             .withAutoRemove(false) // We'll manage cleanup ourselves
+            .withInit(true) // Use tini as PID 1 for proper signal handling
+            .withDevices(Device.parse("/dev/fuse")) // Required for fuse-overlayfs
+            .withCapAdd(Capability.SYS_ADMIN) // Required for FUSE mounts
 
         val container = dockerClient.createContainerCmd(builderImage)
             .withHostConfig(hostConfig)
@@ -121,7 +131,7 @@ class KannichDockerClient(
             .withTty(true)
             .withStdinOpen(true)
             // Keep container running so we can exec into it
-            .withCmd("tail", "-f", "/dev/null")
+            .withCmd("sleep", "infinity")
             .exec()
 
         logger.debug("Created container: ${container.id}")
@@ -182,6 +192,69 @@ class KannichDockerClient(
             stderr = callback.stderr,
             exitCode = exitCode
         )
+    }
+
+    /**
+     * Copies content from an input stream to a file in the container.
+     * Uses Docker's copy API (tar format) for reliable streaming.
+     *
+     * @param containerId Container to copy to
+     * @param path The absolute path to write to in the container
+     * @param content The input stream to read content from
+     * @param append If true, appends to existing file instead of overwriting
+     */
+    fun copyToContainer(containerId: String, path: String, content: InputStream, append: Boolean = false) {
+        val fileName: String
+        val parentDir: String
+        if (path.contains('/')) {
+            fileName = path.substringAfterLast('/')
+            parentDir = path.substringBeforeLast('/')
+        } else {
+            // No directory separator - file is in root or we need a working dir
+            fileName = path
+            parentDir = "/"
+        }
+
+        if (append) {
+            // For append, we need to read existing content first, concatenate, then write
+            val existingContent = try {
+                val result = execInContainer(containerId, listOf("cat", path), silent = true)
+                if (result.success) result.stdout.toByteArray() else ByteArray(0)
+            } catch (e: Exception) {
+                ByteArray(0)
+            }
+            val newContent = content.readBytes()
+            val combined = existingContent + newContent
+            copyToContainerInternal(containerId, parentDir, fileName, ByteArrayInputStream(combined))
+        } else {
+            copyToContainerInternal(containerId, parentDir, fileName, content)
+        }
+    }
+
+    private fun copyToContainerInternal(
+        containerId: String,
+        parentDir: String,
+        fileName: String,
+        content: InputStream
+    ) {
+        // Read content into byte array (needed to set tar entry size)
+        val contentBytes = content.readBytes()
+
+        // Create tar archive in memory
+        val tarBytes = ByteArrayOutputStream()
+        TarArchiveOutputStream(tarBytes).use { tar ->
+            val entry = TarArchiveEntry(fileName)
+            entry.size = contentBytes.size.toLong()
+            tar.putArchiveEntry(entry)
+            tar.write(contentBytes)
+            tar.closeArchiveEntry()
+        }
+
+        // Copy tar to container
+        dockerClient.copyArchiveToContainerCmd(containerId)
+            .withRemotePath(parentDir)
+            .withTarInputStream(ByteArrayInputStream(tarBytes.toByteArray()))
+            .exec()
     }
 
     /**

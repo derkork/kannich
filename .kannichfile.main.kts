@@ -42,15 +42,29 @@ pipeline {
         maven.exec("-B", "package", "-DskipTests")
 
         artifacts {
-            includes("**/target/*.jar")
-            excludes("**/target/*-sources.jar")
-            excludes("**/target/original-*.jar")
+            includes("kannich-*/target/*.jar")
+            excludes("kannich-*/target/*-sources.jar")
+            excludes("kannich-*/target/original-*.jar")
         }
     }
 
 
     execution("test") {
-        job(testModules)
+        job(packageJar)
+    }
+
+    execution("layers") {
+        job("l1") {
+            fs.write("foo.txt", "Hey this is some text!!!!")
+        }
+        job ("l2") {
+            fs.write("foo.txt", "With even more stuff in it!", true)
+            shell.execShell("cat foo.txt")
+            artifacts {
+                includes("foo.txt")
+            }
+        }
+
     }
 
 }

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import dev.kannich.stdlib.context.ExecResult
 import java.io.Closeable
 import java.io.File
+import java.io.InputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -142,6 +143,19 @@ class ContainerManager(
         return exec(listOf("sh", "-c", command), workingDir, env, silent)
     }
 
+    /**
+     * Writes content from an input stream to a file in the container.
+     * Uses Docker's copy API for reliable streaming.
+     *
+     * @param path The absolute path to write to
+     * @param content The input stream to read content from
+     * @param append If true, appends to existing file instead of overwriting
+     */
+    fun writeFile(path: String, content: InputStream, append: Boolean = false) {
+        val containerId = checkInitialized()
+        client.copyToContainer(containerId, path, content, append)
+    }
+
 
     /**
      * Copies multiple artifacts from the container to the host in a single tar operation.
@@ -195,37 +209,41 @@ ARTIFACT_EOF""",
 
     /**
      * Creates a job layer for isolation.
-     * Uses copy-on-write semantics by copying from a parent layer or workspace.
+     * Uses fuse-overlayfs for copy-on-write semantics - instant creation, files only
+     * copied when modified.
      *
-     * @param parentLayerId Optional parent layer to copy from. If null, copies from /workspace.
+     * @param parentLayerId Optional parent layer to base on. If null, uses /workspace.
      */
     fun createJobLayer(parentLayerId: String? = null): String {
-        checkInitialized() // Just validate, don't need the ID here
+        checkInitialized()
 
         val layerId = "layer-${UUID.randomUUID().toString().replace("-", "")}"
         val layerDir = "/kannich/overlays/$layerId"
-        val sourceDir = if (parentLayerId != null) {
+        val lowerDir = if (parentLayerId != null) {
             getLayerWorkDir(parentLayerId)
         } else {
             "/workspace"
         }
 
-        // Create layer directory (silent - internal operation)
-        exec(listOf("mkdir", "-p", layerDir), silent = true)
         logger.info("Creating job layer: $layerId (from ${parentLayerId ?: "workspace"})")
 
-        // Copy source to layer (silent - internal operation)
-        logger.debug("Copying $sourceDir to layer...")
-        val copyResult = execShell(
-            command = "cp -a $sourceDir/. $layerDir/",
+        // Create layer subdirectories: upper (changes), work (overlayfs internal), merged (view)
+        val mkdirResult = execShell(
+            command = "mkdir -p $layerDir/upper $layerDir/work $layerDir/merged",
             silent = true
         )
+        if (!mkdirResult.success) {
+            throw IllegalStateException("Failed to create layer directories: ${mkdirResult.stderr}")
+        }
 
-        if (!copyResult.success) {
-            logger.warn("Copy command failed!")
-            if (copyResult.stderr.isNotEmpty()) {
-                logger.warn("stderr: ${copyResult.stderr}")
-            }
+        // Mount fuse-overlayfs
+        val mountResult = execShell(
+            command = "fuse-overlayfs -o lowerdir=$lowerDir,upperdir=$layerDir/upper,workdir=$layerDir/work $layerDir/merged",
+            silent = true
+        )
+        if (!mountResult.success) {
+            execShell("rm -rf $layerDir", silent = true)
+            throw IllegalStateException("Failed to mount overlayfs: ${mountResult.stderr}")
         }
 
         logger.debug("Created job layer: $layerId")
@@ -234,13 +252,15 @@ ARTIFACT_EOF""",
 
     /**
      * Gets the working directory for a job layer.
+     * Returns the merged overlayfs mount point.
      */
     fun getLayerWorkDir(layerId: String): String {
-        return "/kannich/overlays/$layerId"
+        return "/kannich/overlays/$layerId/merged"
     }
 
     /**
      * Removes a job layer.
+     * Unmounts the overlayfs before removing directories.
      */
     fun removeJobLayer(layerId: String) {
         // Skip cleanup if we're shutting down or already closed
@@ -250,6 +270,8 @@ ARTIFACT_EOF""",
         checkInitialized()
 
         val layerDir = "/kannich/overlays/$layerId"
+        // Unmount overlayfs first (fusermount -u for fuse-overlayfs)
+        execShell("fusermount -u $layerDir/merged 2>/dev/null || true", silent = true)
         execShell("rm -rf $layerDir", silent = true)
         logger.debug("Removed job layer: $layerId")
     }
