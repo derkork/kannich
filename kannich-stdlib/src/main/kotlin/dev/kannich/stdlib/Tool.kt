@@ -1,6 +1,7 @@
 package dev.kannich.stdlib
 
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.measureTimedValue
 
 @PublishedApi
@@ -33,4 +34,37 @@ class JobFailedException(message: String, cause: Throwable? = null) : Exception(
  */
 fun fail(message: String): Nothing {
     throw JobFailedException(message)
+}
+
+/**
+ * Global registry for secret values that should be masked in log output.
+ * Thread-safe and persists for entire execution lifecycle.
+ */
+object SecretRegistry {
+    private val secrets: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    fun register(value: String) {
+        if (value.isNotBlank()) {
+            secrets.add(value)
+        }
+    }
+
+    fun getSecrets(): Set<String> = secrets.toSet()
+
+    fun clear() {
+        secrets.clear()
+    }
+}
+
+/**
+ * Marks a string value as a secret, registering it for masking in log output.
+ * Returns the original value unchanged for use in string interpolation.
+ *
+ * Empty/blank values are ignored (not registered).
+ * Null values return an empty string.
+ */
+fun secret(value: String?): String {
+    if (value.isNullOrBlank()) return value ?: ""
+    SecretRegistry.register(value)
+    return value
 }

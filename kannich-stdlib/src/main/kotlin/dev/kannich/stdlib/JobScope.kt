@@ -18,10 +18,15 @@ import kotlin.coroutines.CoroutineContext
  */
 @OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 @KannichDsl
-class JobScope private constructor() : CopyableThreadContextElement<JobScope?> {
+class JobScope private constructor(name: String) : CopyableThreadContextElement<JobScope?> {
     private val logger = LoggerFactory.getLogger(JobScope::class.java)
     private val cleanupActions = mutableListOf<() -> Unit>()
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
+
+    /**
+     * Logger for this job scope. Can be used in kannichfile to print logs.
+     */
+    val log = LoggerFactory.getLogger("dev.kannich.jobs.Job $name")
 
     /**
      * Shell tool for executing arbitrary commands.
@@ -206,8 +211,8 @@ class JobScope private constructor() : CopyableThreadContextElement<JobScope?> {
          *
          * @return A [JobScopeResult] containing the block's return value and collected artifacts
          */
-        fun <T> withScope(block: JobScope.() -> T): JobScopeResult<T> {
-            val scope = JobScope()
+        fun <T> withScope(name:String, block: JobScope.() -> T): JobScopeResult<T> {
+            val scope = JobScope(name)
             val prev = threadLocal.get()
             threadLocal.set(scope)
             return try {

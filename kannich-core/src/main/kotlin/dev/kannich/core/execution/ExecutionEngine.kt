@@ -52,7 +52,11 @@ class ExecutionEngine(
         }
     }
 
-    private fun executeSteps(steps: List<ExecutionStep>, pipeline: Pipeline, parentLayerId: String? = null): ExecutionResult {
+    private fun executeSteps(
+        steps: List<ExecutionStep>,
+        pipeline: Pipeline,
+        parentLayerId: String? = null
+    ): ExecutionResult {
         var currentLayerId = parentLayerId
         val layersToCleanup = mutableListOf<String>()
 
@@ -68,10 +72,12 @@ class ExecutionEngine(
                         }
                         execResult
                     }
+
                     is ExecutionReference -> {
                         val refExecution = step.execution
                         executeSteps(refExecution.steps, pipeline, currentLayerId)
                     }
+
                     is SequentialSteps -> executeSequential(step.steps, pipeline, currentLayerId)
                     is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
                 }
@@ -93,7 +99,11 @@ class ExecutionEngine(
         }
     }
 
-    private fun executeSequential(steps: List<ExecutionStep>, pipeline: Pipeline, parentLayerId: String? = null): ExecutionResult {
+    private fun executeSequential(
+        steps: List<ExecutionStep>,
+        pipeline: Pipeline,
+        parentLayerId: String? = null
+    ): ExecutionResult {
         var currentLayerId = parentLayerId
         val layersToCleanup = mutableListOf<String>()
 
@@ -108,6 +118,7 @@ class ExecutionEngine(
                         }
                         execResult
                     }
+
                     is ExecutionReference -> executeSteps(step.execution.steps, pipeline, currentLayerId)
                     is SequentialSteps -> executeSequential(step.steps, pipeline, currentLayerId)
                     is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
@@ -124,7 +135,11 @@ class ExecutionEngine(
         }
     }
 
-    private fun executeParallel(steps: List<ExecutionStep>, pipeline: Pipeline, parentLayerId: String? = null): ExecutionResult {
+    private fun executeParallel(
+        steps: List<ExecutionStep>,
+        pipeline: Pipeline,
+        parentLayerId: String? = null
+    ): ExecutionResult {
         // Parallel jobs each get their own layer branching from the same parent
         val results = runBlocking {
             steps.map { step ->
@@ -179,19 +194,19 @@ class ExecutionEngine(
         var output = ""
 
         try {
-            timed("Job ${job.name}") {
-                // Use runBlocking with context elements to ensure proper propagation
-                // across any suspension points in the job execution
-                runBlocking(coroutineContext) {
-                    JobExecutionContext.withContext(jobCtx) {
-                        val scopeResult = JobScope.withScope { job.block(this) }
+            // Use runBlocking with context elements to ensure proper propagation
+            // across any suspension points in the job execution
+            runBlocking(coroutineContext) {
+                JobExecutionContext.withContext(jobCtx) {
+                    val scopeResult = timed("Job ${job.name}") {
+                        JobScope.withScope(job.name) { job.block(this) }
+                    }
 
-                        // Collect artifacts while still in context (so FsTool works)
-                        if (scopeResult.artifacts.isNotEmpty()) {
-                            timed("Collecting artifacts") {
-                                for (spec in scopeResult.artifacts) {
-                                    collectArtifacts(spec, workDir)
-                                }
+                    // Collect artifacts while still in context (so FsTool works)
+                    if (scopeResult.artifacts.isNotEmpty()) {
+                        timed("Collecting artifacts") {
+                            for (spec in scopeResult.artifacts) {
+                                collectArtifacts(spec, workDir)
                             }
                         }
                     }

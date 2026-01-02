@@ -4,7 +4,9 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.Terminal
+import dev.kannich.stdlib.SecretRegistry
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -23,12 +25,13 @@ class ColoredConsoleAppender : AppenderBase<ILoggingEvent>() {
 
     private val terminal = Terminal()
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
+    private val maskedSecret = TextStyles.italic("**secret**")
 
     var verbose: Boolean = false
 
     override fun append(event: ILoggingEvent) {
         val time = timeFormatter.format(Instant.ofEpochMilli(event.timeStamp))
-        val message = event.formattedMessage
+        val message = maskSecrets(event.formattedMessage)
 
         for (line in  message.lines()) {
             val formattedMessage = if (verbose) {
@@ -47,5 +50,16 @@ class ColoredConsoleAppender : AppenderBase<ILoggingEvent>() {
             // Print to stdout (stderr would interfere with piping)
             terminal.println(coloredMessage)
         }
+    }
+
+    private fun maskSecrets(message: String): String {
+        val secrets = SecretRegistry.getSecrets()
+        if (secrets.isEmpty()) return message
+
+        var masked = message
+        for (secret in secrets) {
+            masked = masked.replace(secret, maskedSecret)
+        }
+        return masked
     }
 }
