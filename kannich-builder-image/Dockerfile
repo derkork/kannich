@@ -1,5 +1,17 @@
 # Kannich Builder Image
 # Base image for running Kannich CI builds
+
+# Stage 1: Build minimal JDK using jlink
+FROM eclipse-temurin:21-jdk AS jdk-builder
+RUN jlink \
+    --add-modules java.base,java.compiler,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.xml,jdk.compiler,jdk.unsupported,jdk.zipfs,jdk.crypto.ec \
+    --strip-debug \
+    --no-man-pages \
+    --no-header-files \
+    --compress=zip-6 \
+    --output /jdk-minimal
+
+# Stage 2: Final image
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.title="Kannich Builder"
@@ -44,12 +56,9 @@ RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-29.
     && curl -fsSL https://github.com/docker/buildx/releases/download/v0.30.1/buildx-v0.30.1.linux-amd64 -o /usr/local/lib/docker/cli-plugins/docker-buildx \
     && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-buildx
 
-# Install Eclipse Temurin JDK 21 to private path (not in global PATH)
+# Copy minimal JDK from builder stage (not in global PATH)
 # This allows build pipelines to install their own Java without conflicts
-RUN curl -fsSL -o /tmp/jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse" \
-    && mkdir -p /kannich/jdk \
-    && tar -xzf /tmp/jdk.tar.gz -C /kannich/jdk --strip-components=1 \
-    && rm /tmp/jdk.tar.gz
+COPY --from=jdk-builder /jdk-minimal /kannich/jdk
 
 # JAVA_HOME for kannich's private JDK - NOT added to PATH intentionally
 ENV KANNICH_JAVA_HOME=/kannich/jdk
