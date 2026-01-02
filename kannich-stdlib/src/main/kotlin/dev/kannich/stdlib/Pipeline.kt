@@ -1,5 +1,7 @@
 package dev.kannich.stdlib
 
+import dev.kannich.stdlib.tools.Env
+
 /**
  * Entry point for defining Kannich pipelines.
  */
@@ -16,6 +18,11 @@ class Pipeline internal constructor(
 class PipelineBuilder {
     private val jobs = mutableMapOf<String, Job>()
     private val executions = mutableMapOf<String, Execution>()
+
+    /**
+     * Read-only access to environment variables at pipeline definition time.
+     */
+    val env: Env = Env(System.getenv())
 
     /**
      * Defines a job with the given name and execution block.

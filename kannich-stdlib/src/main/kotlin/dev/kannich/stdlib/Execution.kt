@@ -1,5 +1,7 @@
 package dev.kannich.stdlib
 
+import dev.kannich.stdlib.tools.Env
+
 /**
  * Represents an execution plan that orchestrates jobs.
  */
@@ -20,6 +22,11 @@ class ExecutionBuilder(private val name: String) {
      * The steps of the execution. These are executed in sequential order.
      */
     private val steps = mutableListOf<ExecutionStep>()
+
+    /**
+     * Read-only access to environment variables at execution definition time.
+     */
+    val env: Env = Env(System.getenv())
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
@@ -49,6 +56,11 @@ class ExecutionBuilder(private val name: String) {
 class SequentialBuilder {
     private val steps = mutableListOf<ExecutionStep>()
 
+    /**
+     * Read-only access to environment variables at execution definition time.
+     */
+    val env: Env = Env(System.getenv())
+
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
     }
@@ -68,6 +80,11 @@ class SequentialBuilder {
 
 class ParallelBuilder {
     private val steps = mutableListOf<ExecutionStep>()
+
+    /**
+     * Read-only access to environment variables at execution definition time.
+     */
+    val env: Env = Env(System.getenv())
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
