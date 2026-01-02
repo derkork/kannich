@@ -122,11 +122,9 @@ class KannichCommand : CliktCommand(name = "kannich") {
             val executionResult = executionEngine.runExecution(pipeline, execution!!)
 
             if (executionResult.success) {
-                logger.info("")
-                logger.info("Execution completed successfully!")
+                logger.info("Execution completed successfully.")
             } else {
-                logger.info("")
-                logger.error("Execution failed!")
+                logger.error("Execution failed.")
                 exitProcess(1)
             }
         } catch (e: Exception) {

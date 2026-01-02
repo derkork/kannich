@@ -3,6 +3,7 @@ package dev.kannich.stdlib.tools
 import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.AntPathMatcher
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
@@ -14,6 +15,7 @@ import java.io.InputStream
  * Whitespace and shell metacharacters are automatically escaped while preserving globs.
  */
 class FsTool {
+    private val logger = LoggerFactory.getLogger(FsTool::class.java)
     private val shell = ShellTool()
 
     /**
@@ -185,6 +187,11 @@ class FsTool {
         val ctx = JobExecutionContext.current()
         // Make path absolute if it's relative
         val absolutePath = if (path.startsWith("/")) path else "${ctx.workingDir}/$path"
+        if (append) {
+            logger.info("Appending to $absolutePath")
+        } else {
+            logger.info("Writing to $absolutePath")
+        }
         ctx.executor.writeFile(absolutePath, content, append)
     }
 

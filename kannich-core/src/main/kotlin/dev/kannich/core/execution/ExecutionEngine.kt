@@ -45,10 +45,9 @@ class ExecutionEngine(
         containerManager.initialize()
 
         return try {
-            val result = executeSteps(execution.steps, pipeline)
-            logger.info("Execution completed: $executionName (success=${result.success})")
-            result
+            executeSteps(execution.steps, pipeline)
         } finally {
+            logger.info("Execution finished: $executionName")
             containerManager.close()
         }
     }

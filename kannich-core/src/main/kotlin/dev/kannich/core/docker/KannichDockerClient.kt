@@ -103,8 +103,8 @@ class KannichDockerClient(
         val projectPath = hostProjectPath ?: convertToDockerPath(projectDir.absolutePath)
         val cachePath = hostCachePath ?: convertToDockerPath(cacheDir.absolutePath)
 
-        logger.info("Mounting project: $projectPath -> $workingDir")
-        logger.info("Mounting cache: $cachePath -> /kannich/cache")
+        logger.debug("Mounting project: $projectPath -> $workingDir")
+        logger.debug("Mounting cache: $cachePath -> /kannich/cache")
 
         // Build list of bind mounts
         val binds = mutableListOf(
@@ -114,7 +114,7 @@ class KannichDockerClient(
 
         // Add Docker socket mount if needed (for nested container support)
         getDockerSocketMount()?.let { socketPath ->
-            logger.info("Mounting Docker socket: $socketPath")
+            logger.debug("Mounting Docker socket: $socketPath")
             binds.add(Bind(socketPath, Volume(socketPath)))
         }
 
@@ -196,7 +196,11 @@ class KannichDockerClient(
 
     /**
      * Copies content from an input stream to a file in the container.
-     * Uses Docker's copy API (tar format) for reliable streaming.
+     *
+     * Uses a two-step process: first copies to /tmp via Docker API, then moves
+     * to the target path using exec. This ensures the file is visible to internal
+     * mounts like overlayfs (Docker's copy API writes to the root filesystem,
+     * not to mounts created inside the container).
      *
      * @param containerId Container to copy to
      * @param path The absolute path to write to in the container
@@ -204,16 +208,10 @@ class KannichDockerClient(
      * @param append If true, appends to existing file instead of overwriting
      */
     fun copyToContainer(containerId: String, path: String, content: InputStream, append: Boolean = false) {
-        val fileName: String
-        val parentDir: String
-        if (path.contains('/')) {
-            fileName = path.substringAfterLast('/')
-            parentDir = path.substringBeforeLast('/')
-        } else {
-            // No directory separator - file is in root or we need a working dir
-            fileName = path
-            parentDir = "/"
-        }
+        logger.debug("copyToContainer: path=$path, append=$append")
+
+        // Generate a unique temp file name
+        val tempFile = "/tmp/kannich-write-${System.currentTimeMillis()}-${System.nanoTime()}"
 
         if (append) {
             // For append, we need to read existing content first, concatenate, then write
@@ -225,20 +223,27 @@ class KannichDockerClient(
             }
             val newContent = content.readBytes()
             val combined = existingContent + newContent
-            copyToContainerInternal(containerId, parentDir, fileName, ByteArrayInputStream(combined))
+            copyToTempFile(containerId, tempFile, ByteArrayInputStream(combined))
         } else {
-            copyToContainerInternal(containerId, parentDir, fileName, content)
+            copyToTempFile(containerId, tempFile, content)
         }
+
+        // Move from temp to target path (this runs inside container, sees overlay mounts)
+        val moveResult = execInContainer(containerId, listOf("mv", tempFile, path), silent = true)
+        if (!moveResult.success) {
+            // Clean up temp file on failure
+            execInContainer(containerId, listOf("rm", "-f", tempFile), silent = true)
+            throw IllegalStateException("Failed to move file to $path: ${moveResult.stderr}")
+        }
+        logger.debug("copyToContainer: file written to $path")
     }
 
-    private fun copyToContainerInternal(
-        containerId: String,
-        parentDir: String,
-        fileName: String,
-        content: InputStream
-    ) {
+    private fun copyToTempFile(containerId: String, tempFile: String, content: InputStream) {
         // Read content into byte array (needed to set tar entry size)
         val contentBytes = content.readBytes()
+        logger.debug("copyToTempFile: writing ${contentBytes.size} bytes to $tempFile")
+
+        val fileName = tempFile.substringAfterLast('/')
 
         // Create tar archive in memory
         val tarBytes = ByteArrayOutputStream()
@@ -250,9 +255,9 @@ class KannichDockerClient(
             tar.closeArchiveEntry()
         }
 
-        // Copy tar to container
+        // Copy tar to container's /tmp
         dockerClient.copyArchiveToContainerCmd(containerId)
-            .withRemotePath(parentDir)
+            .withRemotePath("/tmp")
             .withTarInputStream(ByteArrayInputStream(tarBytes.toByteArray()))
             .exec()
     }

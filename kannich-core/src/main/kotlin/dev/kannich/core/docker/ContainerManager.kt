@@ -225,7 +225,7 @@ ARTIFACT_EOF""",
             "/workspace"
         }
 
-        logger.info("Creating job layer: $layerId (from ${parentLayerId ?: "workspace"})")
+        logger.debug("Creating job layer: $layerId (from ${parentLayerId ?: "workspace"})")
 
         // Create layer subdirectories: upper (changes), work (overlayfs internal), merged (view)
         val mkdirResult = execShell(
@@ -270,8 +270,15 @@ ARTIFACT_EOF""",
         checkInitialized()
 
         val layerDir = "/kannich/overlays/$layerId"
+
         // Unmount overlayfs first (fusermount -u for fuse-overlayfs)
-        execShell("fusermount -u $layerDir/merged 2>/dev/null || true", silent = true)
+        // Use -z (lazy) to detach immediately even if busy - cleanup happens when no longer in use
+        val unmountResult = execShell("fusermount -uz $layerDir/merged", silent = true)
+        if (!unmountResult.success) {
+            logger.warn("Failed to unmount layer $layerId: ${unmountResult.stderr}")
+        }
+
+        // Remove layer directory
         execShell("rm -rf $layerDir", silent = true)
         logger.debug("Removed job layer: $layerId")
     }
@@ -299,7 +306,7 @@ ARTIFACT_EOF""",
 
         val containerId = containerIdRef.getAndSet(null)
         if (containerId != null) {
-            logger.info("Cleaning up build container: ${containerId.take(12)}")
+            logger.info("Stopping build container: ${containerId.take(12)}")
             client.stopContainer(containerId)
             client.removeContainer(containerId)
         }
