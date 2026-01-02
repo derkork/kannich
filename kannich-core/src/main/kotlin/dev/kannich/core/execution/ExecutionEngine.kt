@@ -15,9 +15,12 @@ import dev.kannich.stdlib.SequentialSteps
 import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.context.PipelineContext
 import dev.kannich.stdlib.timed
+import dev.kannich.stdlib.tools.EnvTool
+import dev.kannich.stdlib.tools.JobEnvContext
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Executes Kannich pipelines inside Docker containers.
@@ -144,6 +147,9 @@ class ExecutionEngine(
     /**
      * Executes a job in its own layer.
      * Returns the execution result and the layer ID (for chaining to subsequent jobs).
+     *
+     * Uses coroutine context elements to ensure context is properly propagated
+     * across suspension points when running in parallel.
      */
     private fun executeJob(job: Job, parentLayerId: String? = null): Pair<ExecutionResult, String?> {
         logger.info("Running job: ${job.name}")
@@ -162,6 +168,13 @@ class ExecutionEngine(
         val executor = ContainerCommandExecutor(containerManager, workDir)
         val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)
 
+        // Create job environment context for this job
+        val jobEnvCtx = EnvTool.createJobEnvContext()
+
+        // Build coroutine context with all context elements
+        // This ensures proper ThreadLocal propagation across coroutine suspensions
+        val coroutineContext: CoroutineContext = pipelineCtx + jobCtx + jobEnvCtx
+
         // Execute job block with context
         var success = true
         var output = ""
@@ -169,9 +182,13 @@ class ExecutionEngine(
 
         try {
             timed("Job ${job.name}") {
-                JobExecutionContext.withContext(jobCtx) {
-                    val scopeResult = JobScope.withScope { job.block(this) }
-                    artifactSpecs = scopeResult.artifacts
+                // Use runBlocking with context elements to ensure proper propagation
+                // across any suspension points in the job execution
+                runBlocking(coroutineContext) {
+                    JobExecutionContext.withContext(jobCtx) {
+                        val scopeResult = JobScope.withScope { job.block(this) }
+                        artifactSpecs = scopeResult.artifacts
+                    }
                 }
             }
         } catch (e: JobFailedException) {

@@ -1,6 +1,46 @@
 package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.context.JobExecutionContext
+import kotlinx.coroutines.CopyableThreadContextElement
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlin.coroutines.CoroutineContext
+
+/**
+ * Coroutine-aware holder for job-scoped environment variables.
+ * Implements CopyableThreadContextElement to preserve the environment map
+ * across coroutine suspension points.
+ */
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
+class JobEnvContext(
+    val env: MutableMap<String, String> = mutableMapOf()
+) : CopyableThreadContextElement<JobEnvContext?> {
+
+    companion object Key : CoroutineContext.Key<JobEnvContext> {
+        internal val threadLocal = ThreadLocal<JobEnvContext>()
+    }
+
+    override val key: CoroutineContext.Key<JobEnvContext> get() = Key
+
+    override fun updateThreadContext(context: CoroutineContext): JobEnvContext? {
+        val prev = threadLocal.get()
+        threadLocal.set(this)
+        return prev
+    }
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: JobEnvContext?) {
+        if (oldState != null) {
+            threadLocal.set(oldState)
+        } else {
+            threadLocal.remove()
+        }
+    }
+
+    override fun copyForChild(): CopyableThreadContextElement<JobEnvContext?> = this
+
+    override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext =
+        overwritingElement
+}
 
 /**
  * Tool for managing environment variables within a job.
@@ -26,26 +66,40 @@ import dev.kannich.stdlib.context.JobExecutionContext
  */
 class EnvTool {
     companion object {
-        private val jobEnv = ThreadLocal<MutableMap<String, String>>()
-
         /**
          * Gets the current job's mutable environment map.
          * Creates one if it doesn't exist.
          */
         internal fun getJobEnv(): MutableMap<String, String> {
-            var env = jobEnv.get()
-            if (env == null) {
-                env = mutableMapOf()
-                jobEnv.set(env)
+            var ctx = JobEnvContext.threadLocal.get()
+            if (ctx == null) {
+                ctx = JobEnvContext()
+                JobEnvContext.threadLocal.set(ctx)
             }
-            return env
+            return ctx.env
         }
 
         /**
          * Clears the job environment. Called when a job completes.
          */
         internal fun clearJobEnv() {
-            jobEnv.remove()
+            JobEnvContext.threadLocal.remove()
+        }
+
+        /**
+         * Gets the current JobEnvContext for use as a coroutine context element.
+         * Returns null if no job environment is set.
+         */
+        fun getJobEnvContext(): JobEnvContext? = JobEnvContext.threadLocal.get()
+
+        /**
+         * Sets up a new job environment context.
+         * Returns the context for use with coroutines.
+         */
+        fun createJobEnvContext(): JobEnvContext {
+            val ctx = JobEnvContext()
+            JobEnvContext.threadLocal.set(ctx)
+            return ctx
         }
     }
 
@@ -88,6 +142,21 @@ class EnvTool {
      */
     operator fun set(name: String, value: String) {
         getJobEnv()[name] = value
+    }
+
+    /**
+     * Gets an environment variable value using index operator.
+     * First checks job-scoped variables, then falls back to pipeline context.
+     *
+     * @param name The environment variable name
+     * @return The value, or null if not set
+     */
+    operator fun get(name: String): String? {
+        val jobValue = getJobEnv()[name]
+        if (jobValue != null) {
+            return jobValue
+        }
+        return JobExecutionContext.current().pipelineContext.env[name]
     }
 
     /**

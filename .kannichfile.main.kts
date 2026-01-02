@@ -27,6 +27,13 @@ pipeline {
         }
     }
 
+    val docServer = job("DocServer") {
+        shell.execShell("ls -la")
+        cd("docs") {
+            docker.exec("compose", "up")
+        }
+    }
+
     val packageJar = job("Package") {
         maven.exec("-B", "package", "-DskipTests")
 
@@ -48,24 +55,25 @@ pipeline {
     execution("testenv") {
         sequentially {
             job("testenv") {
+                shell.execShell("echo Hello \$WORLD!")
                 shell.execShell("echo \$CI_DUMMY_VAR")
                 shell.execShell("echo 'noot'")
             }
         }
     }
 
+    execution("dummy") {
+        job(docServer)
+    }
+
     execution("build") {
-        sequentially {
-            job(compile)
-            job(test)
-            job(packageJar)
-        }
+        job(compile)
+        job(test)
+        job(packageJar)
     }
 
     execution("quick-build") {
-        sequentially {
-            job(compile)
-            job(packageJar)
-        }
+        job(compile)
+        job(packageJar)
     }
 }

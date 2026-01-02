@@ -2,14 +2,23 @@ package dev.kannich.stdlib
 
 import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.tools.*
+import kotlinx.coroutines.CopyableThreadContextElement
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.slf4j.LoggerFactory
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Scope available inside job blocks.
  * Provides access to shell execution and error handling utilities.
+ *
+ * This scope is available via both ThreadLocal (for regular code) and
+ * CoroutineContext (for coroutine-based code). When running in coroutines,
+ * the scope is automatically preserved across suspension points.
  */
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 @KannichDsl
-class JobScope private constructor() {
+class JobScope private constructor() : CopyableThreadContextElement<JobScope?> {
     private val logger = LoggerFactory.getLogger(JobScope::class.java)
     private val cleanupActions = mutableListOf<() -> Unit>()
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
@@ -158,14 +167,37 @@ class JobScope private constructor() {
         }
     }
 
-    companion object {
-        private val current = ThreadLocal<JobScope>()
+    // CopyableThreadContextElement implementation
+
+    override val key: CoroutineContext.Key<JobScope> get() = Key
+
+    override fun updateThreadContext(context: CoroutineContext): JobScope? {
+        val prev = threadLocal.get()
+        threadLocal.set(this)
+        return prev
+    }
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: JobScope?) {
+        if (oldState != null) {
+            threadLocal.set(oldState)
+        } else {
+            threadLocal.remove()
+        }
+    }
+
+    override fun copyForChild(): CopyableThreadContextElement<JobScope?> = this
+
+    override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext =
+        overwritingElement
+
+    companion object Key : CoroutineContext.Key<JobScope> {
+        private val threadLocal = ThreadLocal<JobScope>()
 
         /**
          * Gets the current JobScope.
          * @throws IllegalStateException if called outside a job block
          */
-        fun current(): JobScope = current.get()
+        fun current(): JobScope = threadLocal.get()
             ?: error("No JobScope available - must be called from within a job block")
 
         /**
@@ -176,17 +208,23 @@ class JobScope private constructor() {
          */
         fun <T> withScope(block: JobScope.() -> T): JobScopeResult<T> {
             val scope = JobScope()
-            val prev = current.get()
-            current.set(scope)
+            val prev = threadLocal.get()
+            threadLocal.set(scope)
             return try {
                 val result = scope.block()
                 JobScopeResult(result, scope.getArtifactSpecs())
             } finally {
                 scope.runCleanup()
                 EnvTool.clearJobEnv()
-                if (prev != null) current.set(prev) else current.remove()
+                if (prev != null) threadLocal.set(prev) else threadLocal.remove()
             }
         }
+
+        /**
+         * Returns the CoroutineContext element for the current scope.
+         * Used when launching coroutines that need access to the current JobScope.
+         */
+        fun asContextElement(): JobScope? = threadLocal.get()
     }
 }
 
