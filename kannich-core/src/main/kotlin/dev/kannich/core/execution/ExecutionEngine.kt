@@ -25,7 +25,8 @@ import java.io.File
  */
 class ExecutionEngine(
     private val containerManager: ContainerManager,
-    private val artifactsDir: File
+    private val artifactsDir: File,
+    private val extraEnv: Map<String, String> = emptyMap()
 ) {
     private val logger = LoggerFactory.getLogger(ExecutionEngine::class.java)
     private val jobResults = mutableMapOf<String, JobResult>()
@@ -152,10 +153,11 @@ class ExecutionEngine(
         val workDir = containerManager.getLayerWorkDir(layerId)
 
         // Create execution context - paths come from ContainerManager
+        // Merge system env with extra env (extra env takes precedence)
         val pipelineCtx = PipelineContext(
             cacheDir = containerManager.containerCacheDir,
             projectDir = containerManager.containerProjectDir,
-            env = System.getenv()
+            env = System.getenv() + extraEnv
         )
         val executor = ContainerCommandExecutor(containerManager, workDir)
         val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)

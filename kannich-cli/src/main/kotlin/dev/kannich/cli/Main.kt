@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import dev.kannich.core.Kannich
 import dev.kannich.core.docker.ContainerManager
@@ -32,6 +33,8 @@ class KannichCommand : CliktCommand(name = "kannich") {
         .default(".kannichfile.main.kts")
     private val verbose by option("--verbose", "-v", help = "Enable verbose/debug output")
         .flag()
+    private val envVars by option("-e", "--env", help = "Set environment variable (KEY=VALUE)")
+        .multiple()
 
     override fun run() {
         configureLogging()
@@ -99,7 +102,21 @@ class KannichCommand : CliktCommand(name = "kannich") {
             hostProjectPath,
             hostCachePath
         )
-        val executionEngine = ExecutionEngine(containerManager, File(artifactsDir))
+
+        // Parse -e KEY=VALUE arguments into a map (split at first =)
+        val extraEnv = envVars.mapNotNull { envVar ->
+            val idx = envVar.indexOf('=')
+            if (idx > 0) {
+                val key = envVar.substring(0, idx)
+                val value = envVar.substring(idx + 1)
+                key to value
+            } else {
+                logger.warn("Invalid environment variable format (expected KEY=VALUE): $envVar")
+                null
+            }
+        }.toMap()
+
+        val executionEngine = ExecutionEngine(containerManager, File(artifactsDir), extraEnv)
 
         try {
             val executionResult = executionEngine.runExecution(pipeline, execution!!)

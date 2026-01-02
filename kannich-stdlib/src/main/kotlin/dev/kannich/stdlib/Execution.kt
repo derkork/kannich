@@ -16,6 +16,9 @@ class SequentialSteps(val steps: List<ExecutionStep>) : ExecutionStep
 class ParallelSteps(val steps: List<ExecutionStep>) : ExecutionStep
 
 class ExecutionBuilder(private val name: String) {
+    /**
+     * The steps of the execution. These are executed in sequential order.
+     */
     private val steps = mutableListOf<ExecutionStep>()
 
     fun job(job: Job) {
