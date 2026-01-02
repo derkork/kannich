@@ -139,7 +139,7 @@
                                 <argument>buildx</argument>
                                 <argument>build</argument>
                                 <argument>-t</argument>
-                                <argument>derkork/kannich:latest</argument>
+                                <argument>derkork/kannich:${project.version}</argument>
                                 <argument>.</argument>
                             </arguments>
                         </configuration>

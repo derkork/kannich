@@ -3,6 +3,7 @@ package dev.kannich.stdlib.tools
 import dev.kannich.stdlib.context.ExecResult
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.secret
+import org.slf4j.LoggerFactory
 
 /**
  * Tool for executing Docker commands.
@@ -17,6 +18,7 @@ import dev.kannich.stdlib.secret
  * ```
  */
 class DockerTool {
+    private val logger = LoggerFactory.getLogger(DockerTool::class.java)
     private val shell = ShellTool()
 
     /**
@@ -49,7 +51,7 @@ class DockerTool {
      */
     fun login(username: String, password: String, registry: String? = null): ExecResult {
         secret(password)
-
+        logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")
         val registryArg = registry ?: ""
         val result = shell.execShell(
             "echo \"\$DOCKER_PASSWORD\" | docker login -u \"$username\" --password-stdin $registryArg".trim(),
@@ -61,6 +63,7 @@ class DockerTool {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Docker login failed: $errorMessage")
         }
+        logger.info("Docker login successful.")
         return result
     }
 }

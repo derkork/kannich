@@ -1,79 +1,54 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.1.0-SNAPSHOT")
-@file:DependsOn("dev.kannich:kannich-maven:0.1.0-SNAPSHOT")
-@file:DependsOn("dev.kannich:kannich-java:0.1.0-SNAPSHOT")
-@file:DependsOn("dev.kannich:kannich-trivy:0.1.0-SNAPSHOT")
-@file:DependsOn("dev.kannich:kannich-helm:0.1.0-SNAPSHOT")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.1.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.1.0")
+@file:DependsOn("dev.kannich:kannich-java:0.1.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.1.0")
+@file:DependsOn("dev.kannich:kannich-helm:0.1.0")
 
 
-import dev.kannich.helm.Helm
 import dev.kannich.java.Java
 import dev.kannich.maven.Maven
 import dev.kannich.stdlib.*
-import dev.kannich.trivy.Trivy
 
 pipeline {
     val java = Java("21")
     val maven = Maven("3.9.6", java)
 
-    val compile = job("Compile") {
-        maven.exec("-B", "compile")
-    }
+    val deploy = job("deploy") {
+        // fail fast, verify required variables
+        val dockerUsername = env["KANNICH_DOCKER_USERNAME"] ?: fail("Please specify username for docker login in KANNICH_DOCKER_USERNAME")
+        val dockerPassword = env["KANNICH_DOCKER_PASSWORD"] ?: fail("Please specify password/token for docker login in KANNICH_DOCKER_PASSWORD")
+        val version = env["KANNICH_VERSION"] ?: fail("Please specify release version in KANNICH_VERSION.")
+        val isLatest = env["KANNICH_IS_LATEST"] ?: "true"
 
-    val test = job("Test") {
-        maven.exec("-B", "test")
+        // check docker login.
+        docker.login(dockerUsername, dockerPassword)
 
-        artifacts {
-            includes("**/target/surefire-reports/**")
+        // set version to desired version
+        maven.exec("-B", "versions:set", "-DnewVersion=$version")
+
+        // build jar and image
+        maven.exec("-B", "-Pbootstrap", "install")
+
+        // push version to docker hub
+        docker.exec("push", "derkork/kannich:$version")
+
+        if (isLatest == "true") {
+            docker.exec("tag", "derkork/kannich:$version", "derkork/kannich:latest")
+            docker.exec("push", "derkork/kannich:latest")
         }
     }
 
-    val testModules = job("test-modules") {
-        java.exec("--version")
-        maven.exec("--version")
-
-        val helm = Helm("3.19.4")
-        helm.exec("version", "--short")
-
-        val trivy = Trivy("0.68.2")
-        trivy.exec("--version")
-    }
-
-    val packageJar = job("Package") {
-        maven.exec("-B", "package", "-DskipTests")
-
-        artifacts {
-            includes("kannich-*/target/*.jar")
-            excludes("kannich-*/target/*-sources.jar")
-            excludes("kannich-*/target/original-*.jar")
-        }
-    }
 
     execution("deploy") {
-        job("deploy") {
-            if (!env.get)
-
-            // build jars and
-            maven.exec("-B", "-Pbootstrap", "install")
-        }
+        job(deploy)
     }
 
 
     execution("test") {
-        job(packageJar)
-    }
-
-    execution("layers") {
-        job("l1") {
-            fs.write("foo.txt", "Hey this is some text!!!!")
+        job("test") {
+            secret("World!")
+            shell.execShell("echo 'Hello World!'")
+            log.info("Hello World!")
         }
-        job ("l2") {
-            fs.write("foo.txt", "With even more stuff in it!", true)
-            shell.execShell("cat foo.txt")
-            artifacts {
-                includes("foo.txt")
-            }
-        }
-
     }
-
 }
