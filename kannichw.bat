@@ -11,7 +11,7 @@ set KANNICH_IMAGE=derkork/kannich:%KANNICH_VERSION%
 if "%KANNICH_CACHE_DIR%"=="" set KANNICH_CACHE_DIR=%USERPROFILE%\.kannich\cache
 
 REM Default prefixes for environment variables to pass to Docker
-set DEFAULT_ENV_PREFIXES=CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_
+set DEFAULT_ENV_PREFIXES=CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_ KANNICH_
 
 REM Determine project directory
 set PROJECT_DIR=%~dp0
