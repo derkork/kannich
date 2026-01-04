@@ -95,7 +95,7 @@ object Fs {
      * @return true if the path exists
      */
     suspend fun exists(path: String): Boolean {
-        return Shell.execShell("test -e '$path'").success
+        return Shell.execShell("test -e '$path'", silent = true).success
     }
 
     /**
@@ -105,7 +105,7 @@ object Fs {
      * @return true if the path is a directory
      */
     suspend fun isDirectory(path: String): Boolean {
-        return Shell.execShell("test -d '$path'").success
+        return Shell.execShell("test -d '$path'", silent = true).success
     }
 
     /**
@@ -115,7 +115,7 @@ object Fs {
      * @return true if the path is a file
      */
     suspend fun isFile(path: String): Boolean {
-        return Shell.execShell("test -f '$path'").success
+        return Shell.execShell("test -f '$path'", silent = true).success
     }
 
     /**
