@@ -15,7 +15,7 @@ class ExecutionReference(val execution: Execution) : ExecutionStep
 class SequentialSteps(val steps: List<ExecutionStep>) : ExecutionStep
 class ParallelSteps(val steps: List<ExecutionStep>) : ExecutionStep
 
-class ExecutionBuilder(private val name: String) {
+class ExecutionBuilder(private val name: String) : Logging by LoggingImpl("Execution $name") {
     /**
      * The steps of the execution. These are executed in sequential order.
      */
@@ -42,17 +42,17 @@ class ExecutionBuilder(private val name: String) {
     }
 
     fun sequentially(block: SequentialBuilder.() -> Unit) {
-        steps.add(SequentialBuilder().apply(block).build())
+        steps.add(SequentialBuilder(name).apply(block).build())
     }
 
     fun parallel(block: ParallelBuilder.() -> Unit) {
-        steps.add(ParallelBuilder().apply(block).build())
+        steps.add(ParallelBuilder(name).apply(block).build())
     }
 
     internal fun build(): Execution = Execution(name, steps.toList())
 }
 
-class SequentialBuilder {
+class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $name") {
     private val steps = mutableListOf<ExecutionStep>()
 
     /**
@@ -73,13 +73,13 @@ class SequentialBuilder {
     }
 
     fun parallel(block: ParallelBuilder.() -> Unit) {
-        steps.add(ParallelBuilder().apply(block).build())
+        steps.add(ParallelBuilder(name).apply(block).build())
     }
 
     internal fun build(): SequentialSteps = SequentialSteps(steps.toList())
 }
 
-class ParallelBuilder {
+class ParallelBuilder(name: String) : Logging by LoggingImpl("Execution $name") {
     private val steps = mutableListOf<ExecutionStep>()
 
     /**

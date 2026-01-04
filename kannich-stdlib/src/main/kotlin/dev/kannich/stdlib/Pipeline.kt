@@ -1,5 +1,8 @@
 package dev.kannich.stdlib
 
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
 /**
  * Entry point for defining Kannich pipelines.
  */
@@ -13,7 +16,7 @@ class Pipeline internal constructor(
 )
 
 @KannichDsl
-class PipelineBuilder {
+class PipelineBuilder : Logging by LoggingImpl("Pipeline") {
     private val jobs = mutableMapOf<String, Job>()
     private val executions = mutableMapOf<String, Execution>()
 

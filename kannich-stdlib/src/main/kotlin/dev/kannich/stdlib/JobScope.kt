@@ -1,8 +1,6 @@
 package dev.kannich.stdlib
 
 import dev.kannich.stdlib.context.currentJobContext
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
 /**
  * Scope available inside job blocks.
@@ -10,14 +8,8 @@ import org.slf4j.LoggerFactory
  * methods that delegate to the underlying JobContext.
  */
 @KannichDsl
-class JobScope(name: String) {
+class JobScope(name: String): Logging by LoggingImpl("Job $name") {
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
-
-    /**
-     * Logger for this job scope. Can be used in kannichfile to print logs.
-     */
-    val logger: Logger = LoggerFactory.getLogger("dev.kannich.jobs.Job $name")
-
 
     /**
      * Returns the value of an environment variable or null if it is not set.
@@ -58,7 +50,7 @@ class JobScope(name: String) {
             block()
             true
         } catch (e: JobFailedException) {
-            logger.warn("Allowed failure: ${e.message}")
+            logWarning("Allowed failure: ${e.message}")
             false
         }
     }
