@@ -4,11 +4,11 @@ import dev.kannich.java.Java
 import dev.kannich.stdlib.JobScope
 import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.CacheTool
-import dev.kannich.stdlib.tools.ExtractTool
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.ShellTool
+import dev.kannich.stdlib.tools.Compressor
+import dev.kannich.stdlib.tools.Shell
 import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.tools.Cache
+import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -89,14 +89,10 @@ class Maven(
     private val java: Java,
     block: MavenBuilder.() -> Unit = {}
 ) {
+    private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
     private val config = MavenBuilder().apply(block)
     private val servers = config.servers
 
-    private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
-    private val cache = CacheTool()
-    private val extract = ExtractTool()
-    private val fs = FsTool()
-    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "maven"
@@ -106,10 +102,10 @@ class Maven(
      * Gets the Maven home directory path inside the container.
      */
     fun home(): String =
-        cache.path("$CACHE_KEY/apache-maven-$version")
+        Cache.path("$CACHE_KEY/apache-maven-$version")
 
     /**
-     * Ensures Maven is installed in the cache.
+     * Ensures Maven is installed in the Cache.
      * Also ensures Java is installed first since Maven depends on it.
      */
     fun ensureInstalled() {
@@ -118,7 +114,7 @@ class Maven(
 
         val cacheKey = "$CACHE_KEY/apache-maven-$version"
 
-        if (cache.exists(cacheKey)) {
+        if (Cache.exists(cacheKey)) {
             logger.debug("Maven $version is already installed.")
             return
         }
@@ -126,17 +122,17 @@ class Maven(
         logger.info("Maven $version is not installed, downloading.")
 
         // Ensure maven cache directory exists
-        cache.ensureDir(CACHE_KEY)
+        Cache.ensureDir(CACHE_KEY)
 
         // Download and extract Maven
         // Apache Maven tarballs extract to "apache-maven-$version" which matches our cache key
         val downloadUrl = getDownloadUrl(version)
-        val mavenDir = cache.path(CACHE_KEY)
-        extract.downloadAndExtract(downloadUrl, mavenDir)
+        val mavenDir = Cache.path(CACHE_KEY)
+        Compressor.downloadAndExtract(downloadUrl, mavenDir)
 
         // Verify extraction succeeded
-        if (!cache.exists(cacheKey)) {
-            throw RuntimeException("Maven extraction failed: expected directory ${cache.path(cacheKey)} not found")
+        if (!Cache.exists(cacheKey)) {
+            throw RuntimeException("Maven extraction failed: expected directory ${Cache.path(cacheKey)} not found")
         }
 
         logger.info("Successfully installed Maven $version.")
@@ -165,7 +161,7 @@ class Maven(
             val settingsPath = generateSettingsXml()
             // Register cleanup to delete settings.xml when job completes
             JobScope.current().onCleanup {
-                fs.delete(settingsPath)
+                Fs.delete(settingsPath)
             }
             listOf("-s", settingsPath)
         } else {
@@ -174,11 +170,11 @@ class Maven(
 
         // Cache the downloaded jar files.
         val repositoryCacheKey = "$CACHE_KEY/repository"
-        cache.ensureDir(repositoryCacheKey)
+        Cache.ensureDir(repositoryCacheKey)
 
-        val allArgs = listOf("-Dmaven.repo.local=${cache.path(repositoryCacheKey)}") +
+        val allArgs = listOf("-Dmaven.repo.local=${Cache.path(repositoryCacheKey)}") +
                       settingsArgs + args.toList()
-        val result = shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), env = env)
+        val result = Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), env = env)
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")
@@ -211,7 +207,7 @@ class Maven(
             appendLine("</settings>")
         }
 
-        fs.write(settingsPath, xml)
+        Fs.write(settingsPath, xml)
         return settingsPath
     }
 

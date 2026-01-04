@@ -6,9 +6,7 @@ import dev.kannich.stdlib.fail
  * Built-in tool for extracting archives.
  * Automatically detects archive format from file extension.
  */
-class ExtractTool {
-    private val fs = FsTool()
-    private val shell = ShellTool()
+object Compressor {
 
     private enum class ArchiveFormat(val extensions: List<String>, val tarFlag: String?) {
         TAR_GZ(listOf(".tar.gz", ".tgz"), "z"),
@@ -43,15 +41,15 @@ class ExtractTool {
      * @throws dev.kannich.stdlib.JobFailedException if extraction fails or format is unsupported
      */
     fun extract(archive: String, dest: String) {
-        fs.mkdir(dest)
+        Fs.mkdir(dest)
 
         val format = ArchiveFormat.detect(archive)
             ?: fail("Unsupported archive format: $archive")
 
         val result = when (format) {
-            ArchiveFormat.ZIP -> shell.exec("unzip", "-q", "-o", archive, "-d", dest)
-            ArchiveFormat.GZ -> shell.execShell("cp '$archive' '$dest/' && gunzip -f '$dest/${archive.substringAfterLast('/')}'")
-            else -> shell.exec("tar", "x${format.tarFlag}f", archive, "-C", dest)
+            ArchiveFormat.ZIP -> Shell.exec("unzip", "-q", "-o", archive, "-d", dest)
+            ArchiveFormat.GZ -> Shell.execShell("cp '$archive' '$dest/' && gunzip -f '$dest/${archive.substringAfterLast('/')}'")
+            else -> Shell.exec("tar", "x${format.tarFlag}f", archive, "-C", dest)
         }
 
         if (!result.success) {
@@ -69,7 +67,7 @@ class ExtractTool {
      * @throws dev.kannich.stdlib.JobFailedException if download or extraction fails
      */
     fun downloadAndExtract(url: String, dest: String, format: String? = null) {
-        fs.mkdir(dest)
+        Fs.mkdir(dest)
 
         val archiveFormat = if (format != null) {
             ArchiveFormat.entries.find { it.extensions.any { ext -> ext.endsWith(format) } }
@@ -81,19 +79,19 @@ class ExtractTool {
         val result = when (archiveFormat) {
             ArchiveFormat.ZIP, ArchiveFormat.GZ -> {
                 // zip and gz don't support piping, need to download first
-                val tempDir = fs.mktemp("extract")
+                val tempDir = Fs.mktemp("extract")
                 val ext = archiveFormat.extensions.first()
                 val tempFile = "$tempDir/archive$ext"
-                val extractResult = shell.execShell("curl -sSLf -o '$tempFile' '$url'")
+                val extractResult = Shell.execShell("curl -sSLf -o '$tempFile' '$url'")
                 if (!extractResult.success) {
-                    fs.delete(tempDir)
+                    Fs.delete(tempDir)
                     fail("Failed to download $url: ${extractResult.stderr}")
                 }
                 extract(tempFile, dest)
-                fs.delete(tempDir)
+                Fs.delete(tempDir)
                 return
             }
-            else -> shell.execShell("curl -sSLf '$url' | tar x${archiveFormat.tarFlag}f - -C '$dest'")
+            else -> Shell.execShell("curl -sSLf '$url' | tar x${archiveFormat.tarFlag}f - -C '$dest'")
         }
 
         if (!result.success) {

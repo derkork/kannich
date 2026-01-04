@@ -8,6 +8,7 @@
 import dev.kannich.java.Java
 import dev.kannich.maven.Maven
 import dev.kannich.stdlib.*
+import dev.kannich.stdlib.tools.*
 
 pipeline {
     val java = Java("21")
@@ -21,7 +22,7 @@ pipeline {
         val isLatest = env["KANNICH_IS_LATEST"] ?: "true"
 
         // check docker login.
-        docker.login(dockerUsername, dockerPassword)
+        Docker.login(dockerUsername, dockerPassword)
 
         // set version to desired version
         maven.exec("-B", "versions:set", "-DnewVersion=$version")
@@ -30,11 +31,11 @@ pipeline {
         maven.exec("-B", "-Pbootstrap", "install")
 
         // push version to docker hub
-        docker.exec("push", "derkork/kannich:$version")
+        Docker.exec("push", "derkork/kannich:$version")
 
         if (isLatest == "true") {
-            docker.exec("tag", "derkork/kannich:$version", "derkork/kannich:latest")
-            docker.exec("push", "derkork/kannich:latest")
+            Docker.exec("tag", "derkork/kannich:$version", "derkork/kannich:latest")
+            Docker.exec("push", "derkork/kannich:latest")
         }
     }
 
@@ -47,7 +48,7 @@ pipeline {
     execution("test") {
         job("test") {
             secret("World!")
-            shell.execShell("echo 'Hello World!'")
+            Shell.execShell("echo 'Hello World!'")
             log.info("Hello World!")
         }
     }

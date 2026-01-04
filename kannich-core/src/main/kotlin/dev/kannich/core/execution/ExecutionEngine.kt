@@ -15,8 +15,7 @@ import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.context.PipelineContext
 import dev.kannich.stdlib.timed
 import dev.kannich.stdlib.tools.EnvTool
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.JobEnvContext
+import dev.kannich.stdlib.tools.Fs
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -245,8 +244,7 @@ class ExecutionEngine(
      * Uses FsTool.glob() for pattern matching (runs within JobExecutionContext).
      */
     private fun collectArtifacts(spec: ArtifactSpec, workDir: String) {
-        val fs = FsTool()
-        val matchingPaths = fs.glob(spec.includes, spec.excludes, workDir)
+        val matchingPaths = Fs.glob(spec.includes, spec.excludes, workDir)
 
         if (matchingPaths.isEmpty()) {
             logger.info("No artifacts matched the patterns")

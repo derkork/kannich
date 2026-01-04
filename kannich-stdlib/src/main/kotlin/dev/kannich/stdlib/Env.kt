@@ -1,4 +1,4 @@
-package dev.kannich.stdlib.tools
+﻿package dev.kannich.stdlib
 
 /**
  * Read-only environment variable accessor.

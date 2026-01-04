@@ -1,10 +1,10 @@
 package dev.kannich.java
 
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.CacheTool
-import dev.kannich.stdlib.tools.ExtractTool
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.ShellTool
+import dev.kannich.stdlib.tools.Cache
+import dev.kannich.stdlib.tools.Compressor
+import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.Shell
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -24,10 +24,6 @@ import org.slf4j.LoggerFactory
  */
 class Java(val version: String) {
     private val logger: Logger = LoggerFactory.getLogger(Java::class.java)
-    private val cache = CacheTool()
-    private val extract = ExtractTool()
-    private val fs = FsTool()
-    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "java"
@@ -37,16 +33,16 @@ class Java(val version: String) {
      * Gets the Java home directory path inside the container.
      */
     fun home(): String =
-        cache.path("$CACHE_KEY/temurin-$version")
+        Cache.path("$CACHE_KEY/temurin-$version")
 
     /**
-     * Ensures Java is installed in the cache.
+     * Ensures Java is installed in the Cache.
      * Downloads from Adoptium (Eclipse Temurin) if not already present.
      */
     fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/temurin-$version"
 
-        if (cache.exists(cacheKey)) {
+        if (Cache.exists(cacheKey)) {
             logger.debug("Java $version is already installed.")
             return
         }
@@ -54,16 +50,16 @@ class Java(val version: String) {
         logger.info("Java $version is not installed, downloading.")
 
         // Ensure java cache directory exists
-        cache.ensureDir(CACHE_KEY)
+        Cache.ensureDir(CACHE_KEY)
 
         // Download and extract Java to the java cache directory
         // Using Eclipse Temurin (Adoptium) for reliable downloads
         val downloadUrl = getDownloadUrl(version)
-        val javaDir = cache.path(CACHE_KEY)
-        extract.downloadAndExtract(downloadUrl, javaDir)
+        val javaDir = Cache.path(CACHE_KEY)
+        Compressor.downloadAndExtract(downloadUrl, javaDir)
 
         // Adoptium extracts to directories like "jdk-21.0.5+11", rename to our expected name
-        fs.move("$javaDir/jdk-${version}*", cache.path(cacheKey))
+        Fs.move("$javaDir/jdk-${version}*", Cache.path(cacheKey))
 
         logger.info("Successfully installed Java $version.")
     }
@@ -79,7 +75,7 @@ class Java(val version: String) {
         ensureInstalled()
         val homeDir = home()
         val env = mapOf("JAVA_HOME" to homeDir)
-        val result = shell.exec("$homeDir/bin/java", *args, env = env)
+        val result = Shell.exec("$homeDir/bin/java", *args, env = env)
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")

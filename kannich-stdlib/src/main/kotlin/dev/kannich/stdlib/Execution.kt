@@ -1,6 +1,6 @@
 package dev.kannich.stdlib
 
-import dev.kannich.stdlib.tools.Env
+import dev.kannich.stdlib.Env
 
 /**
  * Represents an execution plan that orchestrates jobs.

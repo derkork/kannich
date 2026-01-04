@@ -1,10 +1,10 @@
 package dev.kannich.trivy
 
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.CacheTool
-import dev.kannich.stdlib.tools.ExtractTool
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.ShellTool
+import dev.kannich.stdlib.tools.Cache
+import dev.kannich.stdlib.tools.Compressor
+import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.Shell
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -39,10 +39,6 @@ import org.slf4j.LoggerFactory
  */
 class Trivy(val version: String) {
     private val logger: Logger = LoggerFactory.getLogger(Trivy::class.java)
-    private val cache = CacheTool()
-    private val extract = ExtractTool()
-    private val fs = FsTool()
-    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "trivy"
@@ -52,16 +48,16 @@ class Trivy(val version: String) {
      * Gets the Trivy installation directory path inside the container.
      */
     fun home(): String =
-        cache.path("$CACHE_KEY/trivy-$version")
+        Cache.path("$CACHE_KEY/trivy-$version")
 
     /**
-     * Ensures Trivy is installed in the cache.
+     * Ensures Trivy is installed in the Cache.
      * Downloads from GitHub releases if not already present.
      */
     private fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/trivy-$version"
 
-        if (cache.exists(cacheKey)) {
+        if (Cache.exists(cacheKey)) {
             logger.debug("Trivy $version is already installed.")
             return
         }
@@ -69,19 +65,19 @@ class Trivy(val version: String) {
         logger.info("Trivy $version is not installed, downloading.")
 
         // Ensure trivy cache directory exists
-        cache.ensureDir(CACHE_KEY)
+        Cache.ensureDir(CACHE_KEY)
 
         // Create version-specific directory
-        val trivyDir = cache.path(cacheKey)
-        fs.mkdir(trivyDir)
+        val trivyDir = Cache.path(cacheKey)
+        Fs.mkdir(trivyDir)
 
         // Download and extract Trivy
         val downloadUrl = getDownloadUrl(version)
-        extract.downloadAndExtract(downloadUrl, trivyDir)
+        Compressor.downloadAndExtract(downloadUrl, trivyDir)
 
         // Verify extraction succeeded - trivy binary should exist
         val trivyBinary = "$trivyDir/trivy"
-        if (!fs.exists(trivyBinary)) {
+        if (!Fs.exists(trivyBinary)) {
             fail("Trivy extraction failed: expected binary $trivyBinary not found")
         }
 
@@ -103,11 +99,11 @@ class Trivy(val version: String) {
 
         // Set up cache directory for Trivy's vulnerability database
         val dbCacheKey = "$CACHE_KEY/db"
-        cache.ensureDir(dbCacheKey)
-        val dbCachePath = cache.path(dbCacheKey)
+        Cache.ensureDir(dbCacheKey)
+        val dbCachePath = Cache.path(dbCacheKey)
 
         val allArgs = listOf("--cache-dir", dbCachePath) + args.toList()
-        val result = shell.exec(trivyBinary, *allArgs.toTypedArray())
+        val result = Shell.exec(trivyBinary, *allArgs.toTypedArray())
 
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }

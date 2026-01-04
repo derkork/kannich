@@ -1,10 +1,10 @@
 package dev.kannich.helm
 
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.CacheTool
-import dev.kannich.stdlib.tools.ExtractTool
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.ShellTool
+import dev.kannich.stdlib.tools.Cache
+import dev.kannich.stdlib.tools.Compressor
+import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.Shell
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -40,10 +40,6 @@ import org.slf4j.LoggerFactory
  */
 class Helm(val version: String) {
     private val logger: Logger = LoggerFactory.getLogger(Helm::class.java)
-    private val cache = CacheTool()
-    private val extract = ExtractTool()
-    private val fs = FsTool()
-    private val shell = ShellTool()
 
     companion object {
         private const val CACHE_KEY = "helm"
@@ -53,16 +49,16 @@ class Helm(val version: String) {
      * Gets the Helm installation directory path inside the container.
      */
     fun home(): String =
-        cache.path("$CACHE_KEY/helm-$version")
+        Cache.path("$CACHE_KEY/helm-$version")
 
     /**
-     * Ensures Helm is installed in the cache.
+     * Ensures Helm is installed in the Cache.
      * Downloads from get.helm.sh if not already present.
      */
     private fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/helm-$version"
 
-        if (cache.exists(cacheKey)) {
+        if (Cache.exists(cacheKey)) {
             logger.debug("Helm $version is already installed.")
             return
         }
@@ -70,26 +66,26 @@ class Helm(val version: String) {
         logger.info("Helm $version is not installed, downloading.")
 
         // Ensure helm cache directory exists
-        cache.ensureDir(CACHE_KEY)
+        Cache.ensureDir(CACHE_KEY)
 
         // Create version-specific directory
-        val helmDir = cache.path(cacheKey)
-        fs.mkdir(helmDir)
+        val helmDir = Cache.path(cacheKey)
+        Fs.mkdir(helmDir)
 
         // Download and extract Helm
         val downloadUrl = getDownloadUrl(version)
-        extract.downloadAndExtract(downloadUrl, helmDir)
+        Compressor.downloadAndExtract(downloadUrl, helmDir)
 
         // Helm archives extract to linux-amd64/helm, move it to the right place
         val extractedBinary = "$helmDir/linux-amd64/helm"
         val targetBinary = "$helmDir/helm"
-        if (fs.exists(extractedBinary)) {
-            fs.move(extractedBinary, targetBinary)
-            fs.delete("$helmDir/linux-amd64")
+        if (Fs.exists(extractedBinary)) {
+            Fs.move(extractedBinary, targetBinary)
+            Fs.delete("$helmDir/linux-amd64")
         }
 
         // Verify extraction succeeded - helm binary should exist
-        if (!fs.exists(targetBinary)) {
+        if (!Fs.exists(targetBinary)) {
             fail("Helm extraction failed: expected binary $targetBinary not found")
         }
 
@@ -109,7 +105,7 @@ class Helm(val version: String) {
         val homeDir = home()
         val helmBinary = "$homeDir/helm"
 
-        val result = shell.exec(helmBinary, *args)
+        val result = Shell.exec(helmBinary, *args)
 
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }

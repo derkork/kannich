@@ -4,7 +4,7 @@
 # Stage 1: Build minimal JDK using jlink
 FROM eclipse-temurin:21-jdk AS jdk-builder
 RUN jlink \
-    --add-modules java.base,java.compiler,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.xml,jdk.compiler,jdk.unsupported,jdk.zipfs,jdk.crypto.ec \
+    --add-modules java.base,java.compiler,java.instrument,java.logging,java.management,java.naming,java.net.http,java.desktop,java.security.jgss,java.sql,java.xml,jdk.compiler,jdk.unsupported,jdk.zipfs,jdk.crypto.ec \
     --strip-debug \
     --no-man-pages \
     --no-header-files \

@@ -33,20 +33,14 @@ data class ResolvedPackage(
  * Usage:
  * ```kotlin
  * job("build") {
- *     apt.install("gcc", "make", "curl")
- *     apt.install("gcc=4:11.2.0-1ubuntu1", "cmake=3.22.1-1ubuntu1")  // with versions
+ *     Apt.install("gcc", "make", "curl")
+ *     Apt.install("gcc=4:11.2.0-1ubuntu1", "cmake=3.22.1-1ubuntu1")  // with versions
  * }
  * ```
  */
-class AptTool {
-    private val logger = LoggerFactory.getLogger(AptTool::class.java)
-    private val shell = ShellTool()
-    private val fs = FsTool()
-    private val cache = CacheTool()
-
-    companion object {
-        private const val CACHE_KEY_PREFIX = "apt/packages"
-    }
+object Apt {
+    private val logger = LoggerFactory.getLogger(Apt::class.java)
+    private const val CACHE_KEY_PREFIX = "apt/packages"
 
     /**
      * Installs the specified packages, using cache when available.
@@ -99,16 +93,16 @@ class AptTool {
 
         // 6. Partition into cached and uncached packages
         val (cached, uncached) = packagesToInstall.partition { pkg ->
-            cache.exists(pkg.cacheKey())
+            Cache.exists(pkg.cacheKey())
         }
 
         logger.info("Found ${cached.size} packages in cache, ${uncached.size} need download")
 
         // 7. Ensure cache directory exists
-        cache.ensureDir(CACHE_KEY_PREFIX)
+        Cache.ensureDir(CACHE_KEY_PREFIX)
 
         // 8. Download uncached packages
-        val tempDir = if (uncached.isNotEmpty()) fs.mktemp("apt-download") else null
+        val tempDir = if (uncached.isNotEmpty()) Fs.mktemp("apt-download") else null
 
         try {
             val downloadedPaths = mutableListOf<String>()
@@ -117,12 +111,12 @@ class AptTool {
                 downloadedPaths.add(debPath)
 
                 // Cache the downloaded .deb file
-                fs.copy(debPath, cache.path(pkg.cacheKey()))
+                Fs.copy(debPath, Cache.path(pkg.cacheKey()))
                 logger.debug("Cached: ${pkg.name}=${pkg.version}")
             }
 
             // 9. Collect all .deb paths (cached + newly downloaded)
-            val allDebPaths = cached.map { cache.path(it.cacheKey()) } + downloadedPaths
+            val allDebPaths = cached.map { Cache.path(it.cacheKey()) } + downloadedPaths
 
             // 10. Install all packages using dpkg
             installDebFiles(allDebPaths)
@@ -132,24 +126,13 @@ class AptTool {
         } finally {
             // 11. Cleanup temp directory
             if (tempDir != null) {
-                fs.delete(tempDir)
+                Fs.delete(tempDir)
             }
         }
     }
 
     /**
-     * Updates the APT package lists.
-     */
-    private fun update() {
-        logger.info("Updating APT package lists")
-        val result = shell.execShell("sudo apt-get update")
-        if (!result.success) {
-            fail("Failed to update APT package lists: ${result.stderr}")
-        }
-    }
-
-    /**
-     * Clears the apt package cache.
+     * Clears the apt package Cache.
      *
      * @param packageName If specified, clears only cached versions of this package.
      *                    If null, clears all cached apt packages.
@@ -158,11 +141,11 @@ class AptTool {
         if (packageName != null) {
             // Clear all versions of this package
             val pattern = "${CACHE_KEY_PREFIX}/${packageName}_*"
-            shell.execShell("rm -f '${cache.path(pattern)}'")
+            Shell.execShell("rm -f '${Cache.path(pattern)}'")
             logger.info("Cleared cache for package: $packageName")
         } else {
             // Clear entire apt cache
-            cache.clear(CACHE_KEY_PREFIX)
+            Cache.clear(CACHE_KEY_PREFIX)
             logger.info("Cleared all apt package cache")
         }
     }
@@ -185,7 +168,7 @@ class AptTool {
      * Returns: "amd64", "arm64", "i386", etc.
      */
     private fun getSystemArchitecture(): String {
-        val result = shell.exec("dpkg", "--print-architecture")
+        val result = Shell.exec("dpkg", "--print-architecture")
         if (!result.success) {
             fail("Failed to determine system architecture: ${result.stderr}")
         }
@@ -199,7 +182,7 @@ class AptTool {
         val pkgSpec = if (version != null) "$name=$version" else name
 
         // Try to get package info directly
-        val showResult = shell.execShell(
+        val showResult = Shell.execShell(
             "apt-cache show --quiet=0 --no-all-versions '$pkgSpec' 2>&1"
         )
 
@@ -229,7 +212,7 @@ class AptTool {
     private fun resolveVirtualPackage(name: String, defaultArch: String): ResolvedPackage {
         logger.debug("Resolving virtual package: $name")
 
-        val result = shell.exec("apt-cache", "showpkg", name)
+        val result = Shell.exec("apt-cache", "showpkg", name)
         if (!result.success) {
             fail("Failed to resolve virtual package '$name': ${result.stderr}")
         }
@@ -304,7 +287,7 @@ class AptTool {
 
         // Get recursive dependencies
         // Filter to only hard dependencies (Pre-Depends and Depends)
-        val result = shell.execShell(
+        val result = Shell.execShell(
             "apt-cache depends --recurse --no-recommends --no-suggests " +
                 "--no-conflicts --no-breaks --no-replaces --no-enhances " +
                 "'${pkg.name}' 2>/dev/null | grep '^\\w' | sort -u"
@@ -342,7 +325,7 @@ class AptTool {
         logger.debug("Downloading: ${pkg.name}=${pkg.version}")
 
         // apt-get download puts .deb in current directory
-        val result = shell.execShell(
+        val result = Shell.execShell(
             "cd '$targetDir' && apt-get download '${pkg.name}=${pkg.version}' 2>&1"
         )
 
@@ -352,10 +335,10 @@ class AptTool {
 
         // Find the downloaded .deb file
         // Filename format: {name}_{version}_{arch}.deb
-        val findResult = shell.execShell("ls '$targetDir'/${pkg.name}_*.deb 2>/dev/null | head -1")
+        val findResult = Shell.execShell("ls '$targetDir'/${pkg.name}_*.deb 2>/dev/null | head -1")
 
         val debPath = findResult.stdout.trim()
-        if (debPath.isBlank() || !fs.exists(debPath)) {
+        if (debPath.isBlank() || !Fs.exists(debPath)) {
             fail("Downloaded .deb file not found for '${pkg.name}'")
         }
 
@@ -375,7 +358,7 @@ class AptTool {
 
         // Install all .deb files at once for proper dependency ordering
         val debList = debPaths.joinToString(" ") { "'$it'" }
-        val result = shell.execShell("sudo dpkg -i $debList 2>&1")
+        val result = Shell.execShell("sudo dpkg -i $debList 2>&1")
 
         if (!result.success) {
             // dpkg may fail due to missing dependencies - try to fix
@@ -385,10 +368,21 @@ class AptTool {
     }
 
     /**
+     * Updates the APT package lists.
+     */
+    private fun update() {
+        logger.info("Updating APT package lists")
+        val result = Shell.execShell("sudo apt-get update")
+        if (!result.success) {
+            fail("Failed to update APT package lists: ${result.stderr}")
+        }
+    }
+
+    /**
      * Fixes broken package dependencies.
      */
     private fun fixBrokenDependencies() {
-        val result = shell.execShell("sudo apt-get --fix-broken install -y 2>&1")
+        val result = Shell.execShell("sudo apt-get --fix-broken install -y 2>&1")
         if (!result.success) {
             fail("Failed to fix broken dependencies: ${result.stderr}")
         }
@@ -398,7 +392,7 @@ class AptTool {
      * Checks if a specific version of a package is already installed.
      */
     private fun isPackageInstalled(name: String, version: String): Boolean {
-        val result = shell.execShell(
+        val result = Shell.execShell(
             "dpkg-query -W -f='\${Version}' '$name' 2>/dev/null"
         )
         return result.success && result.stdout.trim() == version

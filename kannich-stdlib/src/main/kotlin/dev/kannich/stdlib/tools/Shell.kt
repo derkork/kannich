@@ -6,7 +6,7 @@ import dev.kannich.stdlib.context.JobExecutionContext
 /**
  * Tool for executing shell commands.
  */
-class ShellTool {
+object Shell {
     /**
      * Executes a command with the given arguments.
      * Returns the result for inspection (stdout, stderr, exit code).

@@ -1,9 +1,9 @@
 package dev.kannich.gpg
 
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.FsTool
-import dev.kannich.stdlib.tools.ShellTool
+import dev.kannich.stdlib.tools.Shell
 import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -32,10 +32,8 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Gpg {
+object Gpg {
     private val logger: Logger = LoggerFactory.getLogger(Gpg::class.java)
-    private val shell = ShellTool()
-    private val fs = FsTool()
 
     /**
      * Imports a GPG key from a string.
@@ -57,15 +55,15 @@ class Gpg {
 
         try {
             // Write key to temporary file
-            fs.write(tempKeyFile, key)
+            Fs.write(tempKeyFile, key)
             logger.debug("Wrote GPG key to temporary file: $tempKeyFile")
 
             // Import the key
             doImport(tempKeyFile)
         } finally {
             // Always delete the temporary key file
-            if (fs.exists(tempKeyFile)) {
-                fs.delete(tempKeyFile)
+            if (Fs.exists(tempKeyFile)) {
+                Fs.delete(tempKeyFile)
                 logger.debug("Deleted temporary key file: $tempKeyFile")
             }
         }
@@ -88,15 +86,15 @@ class Gpg {
             "${ctx.workingDir}/$path"
         }
 
-        if (!fs.exists(keyPath)) {
+        if (!Fs.exists(keyPath)) {
             fail("GPG key file not found: $keyPath")
         }
 
         try {
             doImport(keyPath)
         } finally {
-            if (deleteAfterImport && fs.exists(keyPath)) {
-                fs.delete(keyPath)
+            if (deleteAfterImport && Fs.exists(keyPath)) {
+                Fs.delete(keyPath)
                 logger.info("Deleted key file after import: $keyPath")
             }
         }
@@ -109,7 +107,7 @@ class Gpg {
         logger.info("Importing GPG key from: $keyPath")
 
         // Import the key using gpg
-        val result = shell.execShell("gpg --batch --import '$keyPath' 2>&1")
+        val result = Shell.execShell("gpg --batch --import '$keyPath' 2>&1")
 
         if (!result.success) {
             fail("Failed to import GPG key: ${result.stdout}")
@@ -119,7 +117,7 @@ class Gpg {
         logger.info("Successfully imported GPG key")
 
         // Optionally list the imported key for verification
-        val listResult = shell.execShell("gpg --list-secret-keys --keyid-format LONG 2>&1")
+        val listResult = Shell.execShell("gpg --list-secret-keys --keyid-format LONG 2>&1")
         if (listResult.success && listResult.stdout.isNotBlank()) {
             logger.debug("Available secret keys:\n${listResult.stdout}")
         }

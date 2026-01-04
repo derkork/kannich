@@ -17,9 +17,8 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class DockerTool {
-    private val logger = LoggerFactory.getLogger(DockerTool::class.java)
-    private val shell = ShellTool()
+object Docker {
+    private val logger = LoggerFactory.getLogger(Docker::class.java)
 
     /**
      * Executes a docker command with the given arguments.
@@ -31,7 +30,7 @@ class DockerTool {
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
     fun exec(vararg args: String, silent: Boolean = false): ExecResult {
-        val result = shell.exec("docker", *args, silent = silent)
+        val result = Shell.exec("docker", *args, silent = silent)
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Docker command failed: $errorMessage")
@@ -53,7 +52,7 @@ class DockerTool {
         secret(password)
         logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")
         val registryArg = registry ?: ""
-        val result = shell.execShell(
+        val result = Shell.execShell(
             "echo \"\$DOCKER_PASSWORD\" | docker login -u \"$username\" --password-stdin $registryArg".trim(),
             env = mapOf("DOCKER_PASSWORD" to password),
             silent = true

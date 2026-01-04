@@ -9,9 +9,7 @@ import dev.kannich.stdlib.fail
  *
  * Cache structure: /kannich/cache/{key}/...
  */
-class CacheTool {
-    private val fs = FsTool()
-    private val shell = ShellTool()
+object Cache {
 
     /**
      * Checks if a cache key exists.
@@ -20,7 +18,7 @@ class CacheTool {
      * @return true if the cached item exists
      */
     fun exists(key: String): Boolean {
-        return fs.exists(path(key))
+        return Fs.exists(path(key))
     }
 
     /**
@@ -52,10 +50,10 @@ class CacheTool {
      */
     fun clear(key: String? = null) {
         if (key != null) {
-            fs.delete(path(key))
+            Fs.delete(path(key))
         } else {
             // Clear all contents but keep the cache directory itself
-            val result = shell.execShell("rm -rf ${baseDir()}/*")
+            val result = Shell.execShell("rm -rf ${baseDir()}/*")
             if (!result.success) {
                 fail("Failed to clear cache: ${result.stderr}")
             }
@@ -69,6 +67,6 @@ class CacheTool {
      * @throws dev.kannich.stdlib.JobFailedException if directory creation fails
      */
     fun ensureDir(key: String) {
-        fs.mkdir(path(key))
+        Fs.mkdir(path(key))
     }
 }

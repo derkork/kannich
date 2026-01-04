@@ -14,44 +14,8 @@ import java.io.InputStream
  * Some operations support shell glob patterns (*, ?, [...]) in source paths.
  * Whitespace and shell metacharacters are automatically escaped while preserving globs.
  */
-class FsTool {
-    private val logger = LoggerFactory.getLogger(FsTool::class.java)
-    private val shell = ShellTool()
-
-    /**
-     * Escapes shell metacharacters while preserving glob patterns (*, ?, [...]).
-     * This allows paths with spaces to work while still supporting glob expansion.
-     */
-    private fun escapeForGlob(path: String): String {
-        val sb = StringBuilder()
-        var i = 0
-        while (i < path.length) {
-            val c = path[i]
-            when (c) {
-                // Preserve glob characters
-                '*', '?' -> sb.append(c)
-                '[' -> {
-                    // Preserve bracket expressions [...]
-                    val closeBracket = path.indexOf(']', i + 1)
-                    if (closeBracket != -1) {
-                        sb.append(path.substring(i, closeBracket + 1))
-                        i = closeBracket
-                    } else {
-                        sb.append("\\[")
-                    }
-                }
-                // Escape shell metacharacters
-                ' ', '\t', '\n', '(', ')', '<', '>', '&', ';', '|',
-                '$', '`', '\\', '"', '\'', '!', '{', '}', '#' -> {
-                    sb.append('\\')
-                    sb.append(c)
-                }
-                else -> sb.append(c)
-            }
-            i++
-        }
-        return sb.toString()
-    }
+object Fs {
+    private val logger = LoggerFactory.getLogger(Fs::class.java)
 
     /**
      * Creates a temporary directory and returns its path.
@@ -61,7 +25,7 @@ class FsTool {
      * @throws dev.kannich.stdlib.JobFailedException if creation fails
      */
     fun mktemp(prefix: String = "kannich"): String {
-        val result = shell.execShell("mktemp -d -t '$prefix.XXXXXX'")
+        val result = Shell.execShell("mktemp -d -t '$prefix.XXXXXX'")
         if (!result.success) {
             fail("Failed to create temp directory: ${result.stderr}")
         }
@@ -75,7 +39,7 @@ class FsTool {
      * @throws dev.kannich.stdlib.JobFailedException if creation fails
      */
     fun mkdir(path: String) {
-        val result = shell.execShell("mkdir -p '$path'")
+        val result = Shell.execShell("mkdir -p '$path'")
         if (!result.success) {
             fail("Failed to create directory $path: ${result.stderr}")
         }
@@ -91,7 +55,7 @@ class FsTool {
      */
     fun copy(src: String, dest: String, recursive: Boolean = true) {
         val flags = if (recursive) "-r" else ""
-        val result = shell.execShell("cp $flags ${escapeForGlob(src)} '$dest'")
+        val result = Shell.execShell("cp $flags ${escapeForGlob(src)} '$dest'")
         if (!result.success) {
             fail("Failed to copy $src to $dest: ${result.stderr}")
         }
@@ -105,7 +69,7 @@ class FsTool {
      * @throws dev.kannich.stdlib.JobFailedException if move fails
      */
     fun move(src: String, dest: String) {
-        val result = shell.execShell("mv ${escapeForGlob(src)} '$dest'")
+        val result = Shell.execShell("mv ${escapeForGlob(src)} '$dest'")
         if (!result.success) {
             fail("Failed to move $src to $dest: ${result.stderr}")
         }
@@ -118,7 +82,7 @@ class FsTool {
      * @throws dev.kannich.stdlib.JobFailedException if deletion fails
      */
     fun delete(path: String) {
-        val result = shell.execShell("rm -rf ${escapeForGlob(path)}")
+        val result = Shell.execShell("rm -rf ${escapeForGlob(path)}")
         if (!result.success) {
             fail("Failed to delete $path: ${result.stderr}")
         }
@@ -131,7 +95,7 @@ class FsTool {
      * @return true if the path exists
      */
     fun exists(path: String): Boolean {
-        return shell.execShell("test -e '$path'").success
+        return Shell.execShell("test -e '$path'").success
     }
 
     /**
@@ -141,7 +105,7 @@ class FsTool {
      * @return true if the path is a directory
      */
     fun isDirectory(path: String): Boolean {
-        return shell.execShell("test -d '$path'").success
+        return Shell.execShell("test -d '$path'").success
     }
 
     /**
@@ -151,7 +115,7 @@ class FsTool {
      * @return true if the path is a file
      */
     fun isFile(path: String): Boolean {
-        return shell.execShell("test -f '$path'").success
+        return Shell.execShell("test -f '$path'").success
     }
 
     /**
@@ -224,7 +188,7 @@ class FsTool {
         // For literal paths, just check if they exist (no find needed)
         for (path in literalPaths) {
             val fullPath = if (workDir == ".") path else "$workDir/$path"
-            if (shell.execShell("test -e '$fullPath'", silent = true).success) {
+            if (Shell.execShell("test -e '$fullPath'", silent = true).success) {
                 val matchesExclude = excludes.isNotEmpty() &&
                                      AntPathMatcher.matchesAny(excludes, path)
                 if (!matchesExclude) {
@@ -246,7 +210,7 @@ class FsTool {
                 "find $paths \\( -type f -o -type d \\) 2>/dev/null || true"
             }
 
-            val findResult = shell.execShell(findCommand, silent = true)
+            val findResult = Shell.execShell(findCommand, silent = true)
             val prefix = if (workDir == ".") "./" else "$workDir/"
 
             val allPaths = findResult.stdout.lines()
@@ -275,5 +239,39 @@ class FsTool {
      */
     fun glob(pattern: String, baseDir: String? = null): List<String> {
         return glob(listOf(pattern), emptyList(), baseDir)
+    }
+
+    /**
+     * Escapes shell metacharacters while preserving glob patterns (*, ?, [...]).
+     * This allows paths with spaces to work while still supporting glob expansion.
+     */
+    private fun escapeForGlob(path: String): String {
+        val sb = StringBuilder()
+        var i = 0
+        while (i < path.length) {
+            when (val c = path[i]) {
+                // Preserve glob characters
+                '*', '?' -> sb.append(c)
+                '[' -> {
+                    // Preserve bracket expressions [...]
+                    val closeBracket = path.indexOf(']', i + 1)
+                    if (closeBracket != -1) {
+                        sb.append(path.substring(i, closeBracket + 1))
+                        i = closeBracket
+                    } else {
+                        sb.append("\\[")
+                    }
+                }
+                // Escape shell metacharacters
+                ' ', '\t', '\n', '(', ')', '<', '>', '&', ';', '|',
+                '$', '`', '\\', '"', '\'', '!', '{', '}', '#' -> {
+                    sb.append('\\')
+                    sb.append(c)
+                }
+                else -> sb.append(c)
+            }
+            i++
+        }
+        return sb.toString()
     }
 }

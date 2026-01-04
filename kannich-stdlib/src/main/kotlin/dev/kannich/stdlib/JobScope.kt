@@ -29,41 +29,6 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
     val log = LoggerFactory.getLogger("dev.kannich.jobs.Job $name")
 
     /**
-     * Shell tool for executing arbitrary commands.
-     */
-    val shell: ShellTool = ShellTool()
-
-    /**
-     * Filesystem tool for file/directory operations.
-     */
-    val fs: FsTool = FsTool()
-
-    /**
-     * Download tool for fetching files from URLs.
-     */
-    val download: DownloadTool = DownloadTool()
-
-    /**
-     * Extract tool for extracting archives.
-     */
-    val extract: ExtractTool = ExtractTool()
-
-    /**
-     * Cache tool for managing the Kannich cache.
-     */
-    val cache: CacheTool = CacheTool()
-
-    /**
-     * APT tool for installing system packages with caching.
-     */
-    val apt: AptTool = AptTool()
-
-    /**
-     * Docker tool for executing docker commands.
-     */
-    val docker: DockerTool = DockerTool()
-
-    /**
      * Environment tool for reading and writing environment variables.
      */
     val env: EnvTool = EnvTool()
