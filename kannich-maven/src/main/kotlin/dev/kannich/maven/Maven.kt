@@ -1,12 +1,12 @@
 package dev.kannich.maven
 
 import dev.kannich.java.Java
-import dev.kannich.stdlib.JobScope
 import dev.kannich.stdlib.KannichDsl
+import dev.kannich.stdlib.currentJobScope
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.context.currentJobExecutionContext
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
@@ -101,14 +101,14 @@ class Maven(
     /**
      * Gets the Maven home directory path inside the container.
      */
-    fun home(): String =
+    suspend fun home(): String =
         Cache.path("$CACHE_KEY/apache-maven-$version")
 
     /**
      * Ensures Maven is installed in the Cache.
      * Also ensures Java is installed first since Maven depends on it.
      */
-    fun ensureInstalled() {
+    suspend fun ensureInstalled() {
         // Ensure Java is installed first
         java.ensureInstalled()
 
@@ -145,7 +145,7 @@ class Maven(
      * @param args Arguments to pass to Maven
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) {
         ensureInstalled()
 
         val homeDir = home()
@@ -160,7 +160,7 @@ class Maven(
         val settingsArgs = if (servers.isNotEmpty()) {
             val settingsPath = generateSettingsXml()
             // Register cleanup to delete settings.xml when job completes
-            JobScope.current().onCleanup {
+            currentJobScope().onCleanup {
                 Fs.delete(settingsPath)
             }
             listOf("-s", settingsPath)
@@ -185,8 +185,8 @@ class Maven(
      * Generates a settings.xml file with server credentials.
      * Returns the path to the generated file.
      */
-    private fun generateSettingsXml(): String {
-        val ctx = JobExecutionContext.current()
+    private suspend fun generateSettingsXml(): String {
+        val ctx = currentJobExecutionContext()
         val settingsPath = "${ctx.workingDir}/.kannich/settings.xml"
 
         val xml = buildString {

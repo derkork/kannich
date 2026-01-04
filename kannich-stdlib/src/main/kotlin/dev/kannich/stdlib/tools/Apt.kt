@@ -50,7 +50,7 @@ object Apt {
      *
      * @param packages Package specifications (e.g., "gcc=11.2.0", "vim", "build-essential")
      */
-    fun install(vararg packages: String) {
+    suspend fun install(vararg packages: String) {
         if (packages.isEmpty()) return
 
         logger.info("Installing packages: ${packages.joinToString(", ")}")
@@ -137,7 +137,7 @@ object Apt {
      * @param packageName If specified, clears only cached versions of this package.
      *                    If null, clears all cached apt packages.
      */
-    fun clearCache(packageName: String? = null) {
+    suspend fun clearCache(packageName: String? = null) {
         if (packageName != null) {
             // Clear all versions of this package
             val pattern = "${CACHE_KEY_PREFIX}/${packageName}_*"
@@ -167,7 +167,7 @@ object Apt {
      * Gets the system's dpkg architecture.
      * Returns: "amd64", "arm64", "i386", etc.
      */
-    private fun getSystemArchitecture(): String {
+    private suspend fun getSystemArchitecture(): String {
         val result = Shell.exec("dpkg", "--print-architecture")
         if (!result.success) {
             fail("Failed to determine system architecture: ${result.stderr}")
@@ -178,7 +178,7 @@ object Apt {
     /**
      * Resolves a package name to a concrete package, handling virtual packages.
      */
-    private fun resolveToConcretePackage(name: String, version: String?, arch: String): ResolvedPackage {
+    private suspend fun resolveToConcretePackage(name: String, version: String?, arch: String): ResolvedPackage {
         val pkgSpec = if (version != null) "$name=$version" else name
 
         // Try to get package info directly
@@ -209,7 +209,7 @@ object Apt {
      * Resolves a virtual package to its concrete provider.
      * Uses apt-cache showpkg to find "Reverse Provides" section.
      */
-    private fun resolveVirtualPackage(name: String, defaultArch: String): ResolvedPackage {
+    private suspend fun resolveVirtualPackage(name: String, defaultArch: String): ResolvedPackage {
         logger.debug("Resolving virtual package: $name")
 
         val result = Shell.exec("apt-cache", "showpkg", name)
@@ -277,7 +277,7 @@ object Apt {
     /**
      * Collects all dependencies for a package recursively.
      */
-    private fun collectDependencies(
+    private suspend fun collectDependencies(
         pkg: ResolvedPackage,
         collected: MutableSet<ResolvedPackage>,
         defaultArch: String
@@ -321,7 +321,7 @@ object Apt {
      * Downloads a single package using apt-get download.
      * Returns the path to the downloaded .deb file.
      */
-    private fun downloadPackage(pkg: ResolvedPackage, targetDir: String): String {
+    private suspend fun downloadPackage(pkg: ResolvedPackage, targetDir: String): String {
         logger.debug("Downloading: ${pkg.name}=${pkg.version}")
 
         // apt-get download puts .deb in current directory
@@ -348,7 +348,7 @@ object Apt {
     /**
      * Installs .deb files using dpkg.
      */
-    private fun installDebFiles(debPaths: List<String>) {
+    private suspend fun installDebFiles(debPaths: List<String>) {
         if (debPaths.isEmpty()) {
             logger.info("No packages to install")
             return
@@ -370,7 +370,7 @@ object Apt {
     /**
      * Updates the APT package lists.
      */
-    private fun update() {
+    private suspend fun update() {
         logger.info("Updating APT package lists")
         val result = Shell.execShell("sudo apt-get update")
         if (!result.success) {
@@ -381,7 +381,7 @@ object Apt {
     /**
      * Fixes broken package dependencies.
      */
-    private fun fixBrokenDependencies() {
+    private suspend fun fixBrokenDependencies() {
         val result = Shell.execShell("sudo apt-get --fix-broken install -y 2>&1")
         if (!result.success) {
             fail("Failed to fix broken dependencies: ${result.stderr}")
@@ -391,7 +391,7 @@ object Apt {
     /**
      * Checks if a specific version of a package is already installed.
      */
-    private fun isPackageInstalled(name: String, version: String): Boolean {
+    private suspend fun isPackageInstalled(name: String, version: String): Boolean {
         val result = Shell.execShell(
             "dpkg-query -W -f='\${Version}' '$name' 2>/dev/null"
         )

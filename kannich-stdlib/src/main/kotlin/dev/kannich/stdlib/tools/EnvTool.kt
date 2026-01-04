@@ -1,45 +1,48 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.JobExecutionContext
-import kotlinx.coroutines.CopyableThreadContextElement
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import dev.kannich.stdlib.context.currentJobExecutionContext
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 
 /**
- * Coroutine-aware holder for job-scoped environment variables.
- * Implements CopyableThreadContextElement to preserve the environment map
- * across coroutine suspension points.
+ * Coroutine context holder for job-scoped environment variables.
+ * Access via coroutine context using [currentJobEnvContext] or [currentJobEnvContextOrNull].
  */
-@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 class JobEnvContext(
     val env: MutableMap<String, String> = mutableMapOf()
-) : CopyableThreadContextElement<JobEnvContext?> {
+) : CoroutineContext.Element {
 
-    companion object Key : CoroutineContext.Key<JobEnvContext> {
-        internal val threadLocal = ThreadLocal<JobEnvContext>()
-    }
+    companion object Key : CoroutineContext.Key<JobEnvContext>
 
     override val key: CoroutineContext.Key<JobEnvContext> get() = Key
+}
 
-    override fun updateThreadContext(context: CoroutineContext): JobEnvContext? {
-        val prev = threadLocal.get()
-        threadLocal.set(this)
-        return prev
-    }
+/**
+ * Gets the current job environment context.
+ * @throws IllegalStateException if no context is available
+ */
+suspend fun currentJobEnvContext(): JobEnvContext =
+    coroutineContext[JobEnvContext]
+        ?: error("No JobEnvContext available. Are you inside a job block?")
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: JobEnvContext?) {
-        if (oldState != null) {
-            threadLocal.set(oldState)
-        } else {
-            threadLocal.remove()
-        }
-    }
+/**
+ * Gets the current job environment context, or null if not available.
+ */
+suspend fun currentJobEnvContextOrNull(): JobEnvContext? =
+    coroutineContext[JobEnvContext]
 
-    override fun copyForChild(): CopyableThreadContextElement<JobEnvContext?> = this
+/**
+ * Gets the job environment map, or an empty map if no context is available.
+ */
+suspend fun getJobEnv(): Map<String, String> =
+    currentJobEnvContextOrNull()?.env ?: emptyMap()
 
-    override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext =
-        overwritingElement
+/**
+ * Clears the job environment. Called when a job completes.
+ * This is a no-op since the context is scoped to the coroutine.
+ */
+fun clearJobEnv() {
+    // No-op: context is automatically scoped to the coroutine
 }
 
 /**
@@ -65,44 +68,6 @@ class JobEnvContext(
  * ```
  */
 class EnvTool {
-    companion object {
-        /**
-         * Gets the current job's mutable environment map.
-         * Creates one if it doesn't exist.
-         */
-        internal fun getJobEnv(): MutableMap<String, String> {
-            var ctx = JobEnvContext.threadLocal.get()
-            if (ctx == null) {
-                ctx = JobEnvContext()
-                JobEnvContext.threadLocal.set(ctx)
-            }
-            return ctx.env
-        }
-
-        /**
-         * Clears the job environment. Called when a job completes.
-         */
-        internal fun clearJobEnv() {
-            JobEnvContext.threadLocal.remove()
-        }
-
-        /**
-         * Gets the current JobEnvContext for use as a coroutine context element.
-         * Returns null if no job environment is set.
-         */
-        fun getJobEnvContext(): JobEnvContext? = JobEnvContext.threadLocal.get()
-
-        /**
-         * Sets up a new job environment context.
-         * Returns the context for use with coroutines.
-         */
-        fun createJobEnvContext(): JobEnvContext {
-            val ctx = JobEnvContext()
-            JobEnvContext.threadLocal.set(ctx)
-            return ctx
-        }
-    }
-
     /**
      * Gets an environment variable value.
      * First checks job-scoped variables, then falls back to pipeline context.
@@ -111,14 +76,15 @@ class EnvTool {
      * @param default The default value if not set (defaults to empty string)
      * @return The value, or the default if not set
      */
-    fun get(name: String, default: String = ""): String {
+    suspend fun get(name: String, default: String = ""): String {
         // First check job-scoped env
-        val jobValue = getJobEnv()[name]
+        val jobEnv = currentJobEnvContextOrNull()?.env
+        val jobValue = jobEnv?.get(name)
         if (jobValue != null) {
             return jobValue
         }
         // Fall back to pipeline context
-        return JobExecutionContext.current().pipelineContext.env[name] ?: default
+        return currentJobExecutionContext().pipelineContext.env[name] ?: default
     }
 
     /**
@@ -128,20 +94,10 @@ class EnvTool {
      * @param name The environment variable name
      * @return true if the variable is set, false otherwise
      */
-    fun isSet(name: String): Boolean {
-        return getJobEnv().containsKey(name) ||
-                JobExecutionContext.current().pipelineContext.env.containsKey(name)
-    }
-
-    /**
-     * Sets an environment variable for this job.
-     * The variable will be available to all subsequent shell commands.
-     *
-     * @param name The environment variable name
-     * @param value The value to set
-     */
-    operator fun set(name: String, value: String) {
-        getJobEnv()[name] = value
+    suspend fun isSet(name: String): Boolean {
+        val jobEnv = currentJobEnvContextOrNull()?.env
+        return jobEnv?.containsKey(name) == true ||
+                currentJobExecutionContext().pipelineContext.env.containsKey(name)
     }
 
     /**
@@ -151,12 +107,24 @@ class EnvTool {
      * @param name The environment variable name
      * @return The value, or null if not set
      */
-    operator fun get(name: String): String? {
-        val jobValue = getJobEnv()[name]
+    suspend operator fun get(name: String): String? {
+        val jobEnv = currentJobEnvContextOrNull()?.env
+        val jobValue = jobEnv?.get(name)
         if (jobValue != null) {
             return jobValue
         }
-        return JobExecutionContext.current().pipelineContext.env[name]
+        return currentJobExecutionContext().pipelineContext.env[name]
+    }
+
+    /**
+     * Sets an environment variable using index operator.
+     * The variable will be available to all subsequent shell commands.
+     *
+     * @param name The environment variable name
+     * @param value The value to set
+     */
+    suspend operator fun set(name: String, value: String) {
+        currentJobEnvContext().env[name] = value
     }
 
     /**
@@ -165,8 +133,8 @@ class EnvTool {
      *
      * @param name The environment variable name to remove
      */
-    fun remove(name: String) {
-        getJobEnv().remove(name)
+    suspend fun remove(name: String) {
+        currentJobEnvContextOrNull()?.env?.remove(name)
     }
 
     /**
@@ -175,8 +143,9 @@ class EnvTool {
      *
      * @return A map of all environment variables
      */
-    fun getAll(): Map<String, String> {
-        val pipelineEnv = JobExecutionContext.current().pipelineContext.env
-        return pipelineEnv + getJobEnv()
+    suspend fun getAll(): Map<String, String> {
+        val pipelineEnv = currentJobExecutionContext().pipelineContext.env
+        val jobEnv = currentJobEnvContextOrNull()?.env ?: emptyMap()
+        return pipelineEnv + jobEnv
     }
 }

@@ -22,6 +22,22 @@ inline fun <T> timed(label: String, block: () -> T): T {
 }
 
 /**
+ * Executes the given suspend block and logs the time taken.
+ *
+ * @param label A descriptive label for what is being timed (e.g., "Job build")
+ * @param block The suspend code block to execute and time
+ * @return The result of the block
+ */
+suspend fun <T> timedSuspend(label: String, block: suspend () -> T): T {
+    val start = System.nanoTime()
+    val result = block()
+    val duration = System.nanoTime() - start
+    val seconds = duration / 1_000_000_000.0
+    timingLogger.info("$label took ${String.format("%.3f", seconds)}s")
+    return result
+}
+
+/**
  * Exception thrown when a job execution fails.
  */
 class JobFailedException(message: String, cause: Throwable? = null) : Exception(message, cause)

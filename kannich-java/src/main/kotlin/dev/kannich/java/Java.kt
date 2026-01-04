@@ -32,14 +32,14 @@ class Java(val version: String) {
     /**
      * Gets the Java home directory path inside the container.
      */
-    fun home(): String =
+    suspend fun home(): String =
         Cache.path("$CACHE_KEY/temurin-$version")
 
     /**
      * Ensures Java is installed in the Cache.
      * Downloads from Adoptium (Eclipse Temurin) if not already present.
      */
-    fun ensureInstalled() {
+    suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/temurin-$version"
 
         if (Cache.exists(cacheKey)) {
@@ -71,7 +71,7 @@ class Java(val version: String) {
      * @param args Arguments to pass to the java command
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) {
         ensureInstalled()
         val homeDir = home()
         val env = mapOf("JAVA_HOME" to homeDir)

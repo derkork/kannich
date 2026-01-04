@@ -13,9 +13,9 @@ import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
 import dev.kannich.stdlib.context.JobExecutionContext
 import dev.kannich.stdlib.context.PipelineContext
-import dev.kannich.stdlib.timed
-import dev.kannich.stdlib.tools.EnvTool
+import dev.kannich.stdlib.timedSuspend
 import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.JobEnvContext
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -161,8 +161,7 @@ class ExecutionEngine(
      * Executes a job in its own layer.
      * Returns the execution result and the layer ID (for chaining to subsequent jobs).
      *
-     * Uses coroutine context elements to ensure context is properly propagated
-     * across suspension points when running in parallel.
+     * Context elements are passed to the coroutine and accessed via currentCoroutineContext().
      */
     private fun executeJob(job: Job, parentLayerId: String? = null): Pair<ExecutionResult, String?> {
         logger.info("Running job: ${job.name}")
@@ -182,10 +181,10 @@ class ExecutionEngine(
         val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)
 
         // Create job environment context for this job
-        val jobEnvCtx = EnvTool.createJobEnvContext()
+        val jobEnvCtx = JobEnvContext()
 
         // Build coroutine context with all context elements
-        // This ensures proper ThreadLocal propagation across coroutine suspensions
+        // Context is automatically available via currentCoroutineContext() in suspend functions
         val coroutineContext: CoroutineContext = pipelineCtx + jobCtx + jobEnvCtx
 
         // Execute job block with context
@@ -193,20 +192,17 @@ class ExecutionEngine(
         var output = ""
 
         try {
-            // Use runBlocking with context elements to ensure proper propagation
-            // across any suspension points in the job execution
+            // Use runBlocking with context elements - context propagates automatically
             runBlocking(coroutineContext) {
-                JobExecutionContext.withContext(jobCtx) {
-                    val scopeResult = timed("Job ${job.name}") {
-                        JobScope.withScope(job.name) { job.block(this) }
-                    }
+                val scopeResult = timedSuspend("Job ${job.name}") {
+                    JobScope.withScope(job.name) { job.block(this) }
+                }
 
-                    // Collect artifacts while still in context (so FsTool works)
-                    if (scopeResult.artifacts.isNotEmpty()) {
-                        timed("Collecting artifacts") {
-                            for (spec in scopeResult.artifacts) {
-                                collectArtifacts(spec, workDir)
-                            }
+                // Collect artifacts while still in context (so Fs.glob works)
+                if (scopeResult.artifacts.isNotEmpty()) {
+                    timedSuspend("Collecting artifacts") {
+                        for (spec in scopeResult.artifacts) {
+                            collectArtifacts(spec, workDir)
                         }
                     }
                 }
@@ -241,9 +237,9 @@ class ExecutionEngine(
 
     /**
      * Collects artifacts from the container matching the given specification.
-     * Uses FsTool.glob() for pattern matching (runs within JobExecutionContext).
+     * Uses Fs.glob() for pattern matching (runs within JobExecutionContext).
      */
-    private fun collectArtifacts(spec: ArtifactSpec, workDir: String) {
+    private suspend fun collectArtifacts(spec: ArtifactSpec, workDir: String) {
         val matchingPaths = Fs.glob(spec.includes, spec.excludes, workDir)
 
         if (matchingPaths.isEmpty()) {

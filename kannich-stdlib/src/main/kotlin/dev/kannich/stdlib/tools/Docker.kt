@@ -29,7 +29,7 @@ object Docker {
      * @return The execution result
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    fun exec(vararg args: String, silent: Boolean = false): ExecResult {
+    suspend fun exec(vararg args: String, silent: Boolean = false): ExecResult {
         val result = Shell.exec("docker", *args, silent = silent)
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
@@ -48,7 +48,7 @@ object Docker {
      * @return The execution result
      * @throws dev.kannich.stdlib.JobFailedException if login fails
      */
-    fun login(username: String, password: String, registry: String? = null): ExecResult {
+    suspend fun login(username: String, password: String, registry: String? = null): ExecResult {
         secret(password)
         logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")
         val registryArg = registry ?: ""

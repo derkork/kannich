@@ -2,7 +2,7 @@ package dev.kannich.gpg
 
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.context.currentJobExecutionContext
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -45,12 +45,12 @@ object Gpg {
      * @param key The GPG key in ASCII-armored format (including -----BEGIN PGP... headers)
      * @throws dev.kannich.stdlib.JobFailedException if import fails
      */
-    fun importKey(key: String) {
+    suspend fun importKey(key: String) {
         if (key.isBlank()) {
             fail("GPG key cannot be empty")
         }
 
-        val ctx = JobExecutionContext.current()
+        val ctx = currentJobExecutionContext()
         val tempKeyFile = "${ctx.workingDir}/.kannich/gpg-key-${System.currentTimeMillis()}.asc"
 
         try {
@@ -76,8 +76,8 @@ object Gpg {
      * @param deleteAfterImport Whether to delete the key file after import (default: false)
      * @throws dev.kannich.stdlib.JobFailedException if import fails or file doesn't exist
      */
-    fun importKeyFile(path: String, deleteAfterImport: Boolean = false) {
-        val ctx = JobExecutionContext.current()
+    suspend fun importKeyFile(path: String, deleteAfterImport: Boolean = false) {
+        val ctx = currentJobExecutionContext()
 
         // Resolve path relative to workspace if not absolute
         val keyPath = if (path.startsWith("/")) {
@@ -103,7 +103,7 @@ object Gpg {
     /**
      * Performs the actual GPG import operation.
      */
-    private fun doImport(keyPath: String) {
+    private suspend fun doImport(keyPath: String) {
         logger.info("Importing GPG key from: $keyPath")
 
         // Import the key using gpg

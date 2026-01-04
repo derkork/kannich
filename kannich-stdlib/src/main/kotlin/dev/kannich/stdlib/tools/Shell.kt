@@ -1,7 +1,7 @@
 package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.context.ExecResult
-import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.context.currentJobExecutionContext
 
 /**
  * Tool for executing shell commands.
@@ -22,15 +22,15 @@ object Shell {
      * @param silent If true, suppresses output to the console
      * @return The execution result
      */
-    fun exec(
+    suspend fun exec(
         command: String,
         vararg args: String,
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
     ): ExecResult {
-        val ctx = JobExecutionContext.current()
+        val ctx = currentJobExecutionContext()
         val fullCommand = listOf(command) + args.toList()
-        val fullEnv = ctx.pipelineContext.env + EnvTool.getJobEnv() + env
+        val fullEnv = ctx.pipelineContext.env + getJobEnv() + env
         return ctx.executor.exec(fullCommand, ctx.workingDir, fullEnv, silent)
     }
 
@@ -48,13 +48,13 @@ object Shell {
      * @param silent If true, suppresses output to the console
      * @return The execution result
      */
-    fun execShell(
+    suspend fun execShell(
         command: String,
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
     ): ExecResult {
-        val ctx = JobExecutionContext.current()
-        val fullEnv = ctx.pipelineContext.env + EnvTool.getJobEnv() + env
+        val ctx = currentJobExecutionContext()
+        val fullEnv = ctx.pipelineContext.env + getJobEnv() + env
         return ctx.executor.exec(listOf("sh", "-c", command), ctx.workingDir, fullEnv, silent)
     }
 }

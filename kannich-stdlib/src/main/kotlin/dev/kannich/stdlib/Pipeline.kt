@@ -30,7 +30,7 @@ class PipelineBuilder {
      *
      * Use `artifacts { }` within the job block to collect build artifacts.
      */
-    fun job(name: String, block: JobScope.() -> Unit): Job {
+    fun job(name: String, block: suspend JobScope.() -> Unit): Job {
         val builder = JobBuilder(name)
         builder.setBlock(block)
         val job = builder.build()

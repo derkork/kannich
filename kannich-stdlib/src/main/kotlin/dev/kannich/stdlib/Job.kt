@@ -9,7 +9,7 @@ package dev.kannich.stdlib
  */
 class Job internal constructor(
     val name: String,
-    val block: JobScope.() -> Unit
+    val block: suspend JobScope.() -> Unit
 )
 
 /**
@@ -17,9 +17,9 @@ class Job internal constructor(
  */
 @KannichDsl
 class JobBuilder(private val name: String) {
-    private var jobBlock: (JobScope.() -> Unit)? = null
+    private var jobBlock: (suspend JobScope.() -> Unit)? = null
 
-    internal fun setBlock(block: JobScope.() -> Unit) {
+    internal fun setBlock(block: suspend JobScope.() -> Unit) {
         jobBlock = block
     }
 

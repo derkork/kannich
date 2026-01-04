@@ -1,9 +1,7 @@
-﻿package dev.kannich.stdlib.tools
+package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.JobScope
+import dev.kannich.stdlib.currentJobScope
 import dev.kannich.stdlib.fail
-
-
 
 /**
  * Built-in tool for downloading files.
@@ -19,12 +17,12 @@ object Web {
      * @return The path to the downloaded file
      * @throws dev.kannich.stdlib.JobFailedException if the download fails
      */
-    fun download(url: String, filename: String? = null): String {
+    suspend fun download(url: String, filename: String? = null): String {
         // Create temporary directory for download
         val tempDir = Fs.mktemp("download")
 
         // Cleanup on job end
-        JobScope.current().onCleanup { Fs.delete(tempDir) }
+        currentJobScope().onCleanup { Fs.delete(tempDir) }
 
         // Determine filename
         val actualFilename = filename
@@ -52,7 +50,7 @@ object Web {
      * @return The path to the downloaded file
      * @throws dev.kannich.stdlib.JobFailedException if the download fails
      */
-    fun downloadTo(url: String, dest: String, filename: String? = null): String {
+    suspend fun downloadTo(url: String, dest: String, filename: String? = null): String {
         // Determine the output path
         val outputPath = if (filename != null) {
             "$dest/$filename"
@@ -75,7 +73,7 @@ object Web {
         }
 
         // Cleanup when job ends
-        JobScope.current().onCleanup { Fs.delete(outputPath) }
+        currentJobScope().onCleanup { Fs.delete(outputPath) }
 
         return outputPath
     }

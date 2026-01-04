@@ -48,14 +48,14 @@ class Helm(val version: String) {
     /**
      * Gets the Helm installation directory path inside the container.
      */
-    fun home(): String =
+    suspend fun home(): String =
         Cache.path("$CACHE_KEY/helm-$version")
 
     /**
      * Ensures Helm is installed in the Cache.
      * Downloads from get.helm.sh if not already present.
      */
-    private fun ensureInstalled() {
+    private suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/helm-$version"
 
         if (Cache.exists(cacheKey)) {
@@ -99,7 +99,7 @@ class Helm(val version: String) {
      * @param args Arguments to pass to Helm
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) {
         ensureInstalled()
 
         val homeDir = home()

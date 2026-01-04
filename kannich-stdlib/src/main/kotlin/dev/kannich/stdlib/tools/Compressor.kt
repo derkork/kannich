@@ -1,4 +1,4 @@
-﻿package dev.kannich.stdlib.tools
+package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.fail
 
@@ -40,7 +40,7 @@ object Compressor {
      * @param dest The destination directory to extract to
      * @throws dev.kannich.stdlib.JobFailedException if extraction fails or format is unsupported
      */
-    fun extract(archive: String, dest: String) {
+    suspend fun extract(archive: String, dest: String) {
         Fs.mkdir(dest)
 
         val format = ArchiveFormat.detect(archive)
@@ -66,7 +66,7 @@ object Compressor {
      * @param format The archive format (tar.gz, tar.xz, tar.bz2, tar, zip). If null, auto-detected from URL.
      * @throws dev.kannich.stdlib.JobFailedException if download or extraction fails
      */
-    fun downloadAndExtract(url: String, dest: String, format: String? = null) {
+    suspend fun downloadAndExtract(url: String, dest: String, format: String? = null) {
         Fs.mkdir(dest)
 
         val archiveFormat = if (format != null) {

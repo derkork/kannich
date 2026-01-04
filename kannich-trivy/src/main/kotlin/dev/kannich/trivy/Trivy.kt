@@ -47,14 +47,14 @@ class Trivy(val version: String) {
     /**
      * Gets the Trivy installation directory path inside the container.
      */
-    fun home(): String =
+    suspend fun home(): String =
         Cache.path("$CACHE_KEY/trivy-$version")
 
     /**
      * Ensures Trivy is installed in the Cache.
      * Downloads from GitHub releases if not already present.
      */
-    private fun ensureInstalled() {
+    private suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/trivy-$version"
 
         if (Cache.exists(cacheKey)) {
@@ -91,7 +91,7 @@ class Trivy(val version: String) {
      * @param args Arguments to pass to Trivy
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) {
         ensureInstalled()
 
         val homeDir = home()

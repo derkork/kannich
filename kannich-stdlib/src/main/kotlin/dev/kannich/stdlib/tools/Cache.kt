@@ -1,6 +1,6 @@
-﻿package dev.kannich.stdlib.tools
+package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.context.currentJobExecutionContext
 import dev.kannich.stdlib.fail
 
 /**
@@ -17,7 +17,7 @@ object Cache {
      * @param key The cache key (e.g., "java/temurin-21", "maven/apache-maven-3.9.6")
      * @return true if the cached item exists
      */
-    fun exists(key: String): Boolean {
+    suspend fun exists(key: String): Boolean {
         return Fs.exists(path(key))
     }
 
@@ -27,8 +27,8 @@ object Cache {
      * @param key The cache key
      * @return The full path to the cached item
      */
-    fun path(key: String): String {
-        val ctx = JobExecutionContext.current()
+    suspend fun path(key: String): String {
+        val ctx = currentJobExecutionContext()
         return "${ctx.pipelineContext.cacheDir}/$key"
     }
 
@@ -37,8 +37,8 @@ object Cache {
      *
      * @return The cache directory path
      */
-    fun baseDir(): String {
-        val ctx = JobExecutionContext.current()
+    suspend fun baseDir(): String {
+        val ctx = currentJobExecutionContext()
         return ctx.pipelineContext.cacheDir
     }
 
@@ -48,7 +48,7 @@ object Cache {
      * @param key The cache key to clear, or null to clear the entire cache
      * @throws dev.kannich.stdlib.JobFailedException if clearing fails
      */
-    fun clear(key: String? = null) {
+    suspend fun clear(key: String? = null) {
         if (key != null) {
             Fs.delete(path(key))
         } else {
@@ -66,7 +66,7 @@ object Cache {
      * @param key The cache key (directory path relative to cache root)
      * @throws dev.kannich.stdlib.JobFailedException if directory creation fails
      */
-    fun ensureDir(key: String) {
+    suspend fun ensureDir(key: String) {
         Fs.mkdir(path(key))
     }
 }

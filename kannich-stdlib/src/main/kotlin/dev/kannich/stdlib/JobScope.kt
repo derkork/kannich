@@ -1,26 +1,23 @@
 package dev.kannich.stdlib
 
 import dev.kannich.stdlib.context.JobExecutionContext
+import dev.kannich.stdlib.context.currentJobExecutionContext
 import dev.kannich.stdlib.tools.*
-import kotlinx.coroutines.CopyableThreadContextElement
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 
 /**
  * Scope available inside job blocks.
  * Provides access to shell execution and error handling utilities.
  *
- * This scope is available via both ThreadLocal (for regular code) and
- * CoroutineContext (for coroutine-based code). When running in coroutines,
- * the scope is automatically preserved across suspension points.
+ * Access the current scope via [currentJobScope] suspend function.
  */
-@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 @KannichDsl
-class JobScope private constructor(name: String) : CopyableThreadContextElement<JobScope?> {
+class JobScope private constructor(name: String) : CoroutineContext.Element {
     private val logger = LoggerFactory.getLogger(JobScope::class.java)
-    private val cleanupActions = mutableListOf<() -> Unit>()
+    private val cleanupActions = mutableListOf<suspend () -> Unit>()
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
 
     /**
@@ -61,7 +58,7 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
      * @param block The block to execute
      * @return true if the block executed successfully, false if it failed
      */
-    fun allowFailure(block: () -> Unit): Boolean {
+    suspend fun allowFailure(block: suspend () -> Unit): Boolean {
         return try {
             block()
             true
@@ -78,7 +75,7 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
      *
      * @param action The cleanup action to execute
      */
-    fun onCleanup(action: () -> Unit) {
+    fun onCleanup(action: suspend () -> Unit) {
         cleanupActions.add(action)
     }
 
@@ -102,8 +99,8 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
      * @return The result of the block
      * @throws JobFailedException if the directory does not exist
      */
-    fun <T> cd(path: String, block: () -> T): T {
-        val currentCtx = JobExecutionContext.current()
+    suspend fun <T> cd(path: String, block: suspend () -> T): T {
+        val currentCtx = currentJobExecutionContext()
         val newWorkingDir = "${currentCtx.workingDir}/$path"
 
         // Check if directory exists before changing to it
@@ -122,14 +119,16 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
             executor = currentCtx.executor,
             workingDir = newWorkingDir
         )
-        return JobExecutionContext.withContext(newCtx, block)
+        return withContext(newCtx) {
+            block()
+        }
     }
 
     /**
      * Runs all registered cleanup actions in reverse order.
      * Exceptions during cleanup are logged but don't prevent other cleanups from running.
      */
-    internal fun runCleanup() {
+    internal suspend fun runCleanup() {
         cleanupActions.asReversed().forEach { action ->
             runCatching { action() }.onFailure { e ->
                 logger.warn("Cleanup action failed: ${e.message}")
@@ -137,66 +136,37 @@ class JobScope private constructor(name: String) : CopyableThreadContextElement<
         }
     }
 
-    // CopyableThreadContextElement implementation
-
     override val key: CoroutineContext.Key<JobScope> get() = Key
 
-    override fun updateThreadContext(context: CoroutineContext): JobScope? {
-        val prev = threadLocal.get()
-        threadLocal.set(this)
-        return prev
-    }
-
-    override fun restoreThreadContext(context: CoroutineContext, oldState: JobScope?) {
-        if (oldState != null) {
-            threadLocal.set(oldState)
-        } else {
-            threadLocal.remove()
-        }
-    }
-
-    override fun copyForChild(): CopyableThreadContextElement<JobScope?> = this
-
-    override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext =
-        overwritingElement
-
     companion object Key : CoroutineContext.Key<JobScope> {
-        private val threadLocal = ThreadLocal<JobScope>()
-
-        /**
-         * Gets the current JobScope.
-         * @throws IllegalStateException if called outside a job block
-         */
-        fun current(): JobScope = threadLocal.get()
-            ?: error("No JobScope available - must be called from within a job block")
-
         /**
          * Executes a block with a new JobScope, ensuring cleanup runs on completion.
          * This is used by the execution engine to wrap job execution.
          *
          * @return A [JobScopeResult] containing the block's return value and collected artifacts
          */
-        fun <T> withScope(name:String, block: JobScope.() -> T): JobScopeResult<T> {
+        suspend fun <T> withScope(name: String, block: suspend JobScope.() -> T): JobScopeResult<T> {
             val scope = JobScope(name)
-            val prev = threadLocal.get()
-            threadLocal.set(scope)
             return try {
-                val result = scope.block()
-                JobScopeResult(result, scope.getArtifactSpecs())
+                withContext(scope) {
+                    val result = scope.block()
+                    JobScopeResult(result, scope.getArtifactSpecs())
+                }
             } finally {
                 scope.runCleanup()
-                EnvTool.clearJobEnv()
-                if (prev != null) threadLocal.set(prev) else threadLocal.remove()
+                clearJobEnv()
             }
         }
-
-        /**
-         * Returns the CoroutineContext element for the current scope.
-         * Used when launching coroutines that need access to the current JobScope.
-         */
-        fun asContextElement(): JobScope? = threadLocal.get()
     }
 }
+
+/**
+ * Gets the current JobScope.
+ * @throws IllegalStateException if called outside a job block
+ */
+suspend fun currentJobScope(): JobScope =
+    coroutineContext[JobScope]
+        ?: error("No JobScope available - must be called from within a job block")
 
 /**
  * Result from executing a job scope block, including collected artifacts.
