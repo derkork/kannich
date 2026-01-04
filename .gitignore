@@ -37,3 +37,7 @@ target/
 kannich-builder-image/kannich-cli.jar
 kannich-builder-image/m2-repo/*
 !kannich-builder-image/m2-repo/.gitkeep
+
+
+### Other stuff
+test_release.bat
