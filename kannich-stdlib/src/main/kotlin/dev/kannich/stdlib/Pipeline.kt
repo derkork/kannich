@@ -32,16 +32,16 @@ class PipelineBuilder : Logging by LoggingImpl("Pipeline") {
      *
      * Use `artifacts { }` within the job block to collect build artifacts.
      */
-    fun job(name: String, block: suspend JobScope.() -> Unit): Job {
-        val builder = JobBuilder(name)
+    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit): Job {
+        val builder = JobBuilder(name, description)
         builder.setBlock(block)
         val job = builder.build()
         jobs[name] = job
         return job
     }
 
-    fun execution(name: String, block: ExecutionBuilder.() -> Unit): Execution {
-        val execution = ExecutionBuilder(name).apply(block).build()
+    fun execution(name: String, description: String? = null, block: ExecutionBuilder.() -> Unit): Execution {
+        val execution = ExecutionBuilder(name, description).apply(block).build()
         executions[name] = execution
         return execution
     }

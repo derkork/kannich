@@ -17,8 +17,7 @@ import dev.kannich.core.docker.ContainerManager
 import dev.kannich.core.docker.KannichDockerClient
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
-import dev.kannich.stdlib.Pipeline
-import dev.kannich.stdlib.PipelineEnv
+import dev.kannich.stdlib.*
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
@@ -38,14 +37,16 @@ class KannichCommand : CliktCommand(name = "kannich") {
         .multiple()
     private val devMode by option("--dev-mode", "-d", help = "Use host Maven repository for extension development")
         .flag()
+    private val list by option("--list", "-l", help = "List the contents of the kannichfile")
+        .flag()
 
     override fun run() {
         configureLogging()
         logger.info("Kannich ${Kannich.VERSION}")
 
-        if (execution == null) {
+        if (execution == null && !list) {
             logger.info("Usage: kannich [OPTIONS] <execution>")
-            logger.info("No execution specified. Use 'kannich <execution>' to run a pipeline.")
+            logger.error("No execution specified. Use 'kannich <execution>' to run a pipeline.")
             return
         }
 
@@ -103,7 +104,12 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
 
-        logger.info("Pipeline loaded: ${pipeline.jobs.size} jobs, ${pipeline.executions.size} executions")
+        logger.info("Pipeline loaded.")
+
+        if (list) {
+            listPipeline(pipeline, execution)
+            return
+        }
 
         // Check if requested execution exists
         if (!pipeline.executions.containsKey(execution)) {
@@ -170,6 +176,51 @@ class KannichCommand : CliktCommand(name = "kannich") {
         if (verbose) {
             rootLogger.level = Level.DEBUG
             kannichLogger.level = Level.DEBUG
+        }
+    }
+
+    private fun listPipeline(pipeline: Pipeline, targetExecution: String?) {
+        val executionsToList = if (targetExecution != null) {
+            val exec = pipeline.executions[targetExecution]
+            if (exec == null) {
+                logger.error("Execution '$targetExecution' not found")
+                exitProcess(1)
+            }
+            listOf(exec)
+        } else {
+            pipeline.executions.values.toList()
+        }
+
+        logger.info("Pipeline contents:")
+        executionsToList.forEach { exec ->
+            val desc = if (!exec.description.isNullOrBlank()) " - ${exec.description}" else ""
+            logger.info("[E] ${exec.name}$desc")
+            printSteps(exec.steps, "  ")
+        }
+    }
+
+    private fun printSteps(steps: List<ExecutionStep>, indent: String, inParallel: Boolean = false) {
+        steps.forEach { step ->
+            val prefix = if (inParallel) "| - " else "- "
+            when (step) {
+                is JobExecutionStep -> {
+                    val job = step.job
+                    val desc = if (!job.description.isNullOrBlank()) " - ${job.description}" else ""
+                    logger.info("$indent$prefix[J] ${job.name}$desc")
+                }
+                is ExecutionReference -> {
+                    val exec = step.execution
+                    val desc = if (!exec.description.isNullOrBlank()) " - ${exec.description}" else ""
+                    logger.info("$indent$prefix[E] ${exec.name}$desc")
+                    printSteps(exec.steps, indent + if (inParallel) "|   " else "  ")
+                }
+                is SequentialSteps -> {
+                    printSteps(step.steps, indent, inParallel)
+                }
+                is ParallelSteps -> {
+                    printSteps(step.steps, indent, true)
+                }
+            }
         }
     }
 }

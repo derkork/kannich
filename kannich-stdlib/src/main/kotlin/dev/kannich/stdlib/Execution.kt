@@ -5,6 +5,7 @@ package dev.kannich.stdlib
  */
 class Execution internal constructor(
     val name: String,
+    val description: String? = null,
     val steps: List<ExecutionStep>
 )
 
@@ -15,7 +16,7 @@ class ExecutionReference(val execution: Execution) : ExecutionStep
 class SequentialSteps(val steps: List<ExecutionStep>) : ExecutionStep
 class ParallelSteps(val steps: List<ExecutionStep>) : ExecutionStep
 
-class ExecutionBuilder(private val name: String) : Logging by LoggingImpl("Execution $name") {
+class ExecutionBuilder(private val name: String, private val description: String? = null) : Logging by LoggingImpl("Execution $name") {
     /**
      * The steps of the execution. These are executed in sequential order.
      */
@@ -31,8 +32,8 @@ class ExecutionBuilder(private val name: String) : Logging by LoggingImpl("Execu
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, block: suspend JobScope.() -> Unit) {
-        val builder = JobBuilder(name)
+    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+        val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))
     }
@@ -49,7 +50,7 @@ class ExecutionBuilder(private val name: String) : Logging by LoggingImpl("Execu
         steps.add(ParallelBuilder(name).apply(block).build())
     }
 
-    internal fun build(): Execution = Execution(name, steps.toList())
+    internal fun build(): Execution = Execution(name, description, steps.toList())
 }
 
 class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $name") {
@@ -66,8 +67,8 @@ class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $n
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, block: suspend JobScope.() -> Unit) {
-        val builder = JobBuilder(name)
+    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+        val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))
     }
@@ -92,8 +93,8 @@ class ParallelBuilder(name: String) : Logging by LoggingImpl("Execution $name") 
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, block: suspend JobScope.() -> Unit) {
-        val builder = JobBuilder(name)
+    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+        val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))
     }
