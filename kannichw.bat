@@ -17,6 +17,13 @@ REM Determine project directory
 set PROJECT_DIR=%~dp0
 set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 
+REM Detect --dev-mode / -d flag (passed through to CLI, but we need to mount volume)
+set DEV_MODE=0
+for %%A in (%*) do (
+    if "%%A"=="--dev-mode" set DEV_MODE=1
+    if "%%A"=="-d" set DEV_MODE=1
+)
+
 REM Check for Docker
 where docker >nul 2>&1
 if errorlevel 1 (
@@ -65,6 +72,13 @@ set PROJECT_DOCKER_PATH=/%DRIVE_LETTER%%PROJECT_PATH_REMAINDER%
 set CACHE_DRIVE_LETTER=%CACHE_DIR_DOCKER:~0,1%
 set CACHE_PATH_REMAINDER=%CACHE_DIR_DOCKER:~2%
 set CACHE_DOCKER_PATH=/%CACHE_DRIVE_LETTER%%CACHE_PATH_REMAINDER%
+
+REM Host .m2 repository path for dev mode
+set HOST_M2_REPO=%USERPROFILE%\.m2\repository
+set M2_DIR_DOCKER=%HOST_M2_REPO:\=/%
+set M2_DRIVE_LETTER=%M2_DIR_DOCKER:~0,1%
+set M2_PATH_REMAINDER=%M2_DIR_DOCKER:~2%
+set M2_DOCKER_PATH=/%M2_DRIVE_LETTER%%M2_PATH_REMAINDER%
 
 REM Generate unique container name using timestamp
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DATETIME=%%I
@@ -147,6 +161,17 @@ if defined DOCKER_HOST (
     )
 )
 
+REM Dev mode: mount host .m2/repository
+set DEV_MODE_MOUNT=
+if %DEV_MODE%==1 (
+    if not exist "%HOST_M2_REPO%\" (
+        echo Error: Dev mode requires %%USERPROFILE%%\.m2\repository to exist.
+        echo Run 'mvn install' on a project first to create it.
+        exit /b 1
+    )
+    set "DEV_MODE_MOUNT=-v "%M2_DOCKER_PATH%:/kannich/dev-repo""
+)
+
 REM Run Kannich inside Docker
 REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
@@ -156,6 +181,7 @@ docker run --rm -it ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
     %DOCKER_SOCKET_MOUNT% ^
+    %DEV_MODE_MOUNT% ^
     %ENV_ARGS% ^
     -w /workspace ^
     %KANNICH_IMAGE% ^

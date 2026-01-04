@@ -21,6 +21,7 @@ import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.PipelineEnv
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Files
 import kotlin.system.exitProcess
 
 class KannichCommand : CliktCommand(name = "kannich") {
@@ -35,6 +36,8 @@ class KannichCommand : CliktCommand(name = "kannich") {
         .flag()
     private val envVars by option("-e", "--env", help = "Set environment variable (KEY=VALUE)")
         .multiple()
+    private val devMode by option("--dev-mode", "-d", help = "Use host Maven repository for extension development")
+        .flag()
 
     override fun run() {
         configureLogging()
@@ -61,6 +64,9 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
         logger.info("Docker: ${dockerClient.version()}")
+
+        // Setup Maven repository symlink (normal mode: cached, dev mode: host .m2)
+        setupMavenRepository()
 
         // Parse -e KEY=VALUE arguments into a map (split at first =)
         // This is done before script evaluation so getEnv() in builders can see these values
@@ -125,6 +131,29 @@ class KannichCommand : CliktCommand(name = "kannich") {
             logger.error("Error during execution: ${e.message}")
             exitProcess(1)
         }
+    }
+
+    private fun setupMavenRepository() {
+        val m2Dir = File("/root/.m2")
+        m2Dir.mkdirs()
+
+        val target = if (devMode) {
+            val devRepo = File("/kannich/dev-repo")
+            if (!devRepo.exists()) {
+                logger.error("Dev mode requires host .m2/repository to be mounted.")
+                logger.error("Ensure ~/.m2/repository exists on host.")
+                exitProcess(1)
+            }
+            logger.info("Dev mode: using host Maven repository")
+            devRepo.toPath()
+        } else {
+            val cacheRepo = File("/kannich/cache/kannich-deps")
+            cacheRepo.mkdirs()
+            cacheRepo.toPath()
+        }
+
+        val repoDir = m2Dir.resolve("repository")
+        Files.createSymbolicLink(repoDir.toPath(), target)
     }
 
     private fun configureLogging() {

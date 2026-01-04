@@ -16,50 +16,6 @@
     <name>Kannich Builder Image</name>
     <description>Docker image for running Kannich pipelines</description>
 
-    <dependencies>
-        <!-- Depend on all Kannich modules to ensure they're built first -->
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-cli</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-stdlib</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-java</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-maven</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-gpg</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-trivy</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-helm</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
-
     <build>
         <plugins>
             <!-- Skip Kotlin compilation (this is a pom-only module) -->
@@ -102,19 +58,6 @@
                                 </artifactItem>
                             </artifactItems>
                             <outputDirectory>${project.basedir}</outputDirectory>
-                        </configuration>
-                    </execution>
-                    <!-- Copy all Kannich modules to m2-repo for offline Docker builds -->
-                    <execution>
-                        <id>copy-kannich-modules</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.basedir}/m2-repo</outputDirectory>
-                            <useRepositoryLayout>true</useRepositoryLayout>
-                            <includeGroupIds>dev.kannich</includeGroupIds>
                         </configuration>
                     </execution>
                 </executions>
@@ -162,7 +105,6 @@
                         <configuration>
                             <target>
                                 <delete file="${project.basedir}/kannich-cli.jar" quiet="true"/>
-                                <delete dir="${project.basedir}/m2-repo" quiet="true"/>
                             </target>
                         </configuration>
                     </execution>

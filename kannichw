@@ -23,6 +23,17 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
 
+# Detect --dev-mode / -d flag (passed through to CLI, but we need to mount volume)
+DEV_MODE=0
+for arg in "$@"; do
+    case "$arg" in
+        --dev-mode|-d)
+            DEV_MODE=1
+            break
+            ;;
+    esac
+done
+
 # Check for Docker
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}Error: Docker not found. Please install Docker.${NC}"
@@ -59,10 +70,15 @@ fi
 PROJECT_DOCKER_PATH="$PROJECT_DIR"
 CACHE_DOCKER_PATH="$KANNICH_CACHE_DIR"
 
+# Host .m2 repository path for dev mode
+HOST_M2_REPO="${HOME}/.m2/repository"
+M2_DOCKER_PATH="$HOST_M2_REPO"
+
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     # Convert D:\foo to /d/foo
     PROJECT_DOCKER_PATH=$(echo "$PROJECT_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
     CACHE_DOCKER_PATH=$(echo "$KANNICH_CACHE_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
+    M2_DOCKER_PATH=$(echo "$HOST_M2_REPO" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
 fi
 
 # Container name for cleanup
@@ -132,6 +148,17 @@ cleanup() {
 # Trap signals to ensure cleanup
 trap cleanup EXIT INT TERM
 
+# Dev mode: mount host .m2/repository
+DEV_MODE_MOUNT=""
+if [ "$DEV_MODE" -eq 1 ]; then
+    if [ ! -d "$HOST_M2_REPO" ]; then
+        echo -e "${RED}Error: Dev mode requires ~/.m2/repository to exist.${NC}"
+        echo -e "Run 'mkdir -p ~/.m2/repository' or 'mvn install' on a project first."
+        exit 1
+    fi
+    DEV_MODE_MOUNT="-v $M2_DOCKER_PATH:/kannich/dev-repo"
+fi
+
 # Run Kannich inside Docker
 # --init: Use tini for proper signal handling and zombie reaping
 # --name: Named container for cleanup on Ctrl+C
@@ -142,6 +169,7 @@ docker run --rm -it \
     -v "$PROJECT_DOCKER_PATH:/workspace" \
     -v "$CACHE_DOCKER_PATH:/kannich/cache" \
     $DOCKER_SOCKET_MOUNT \
+    $DEV_MODE_MOUNT \
     $ENV_ARGS \
     -w /workspace \
     "$KANNICH_IMAGE" \

@@ -64,14 +64,10 @@ COPY --from=jdk-builder /jdk-minimal /kannich/jdk
 ENV KANNICH_JAVA_HOME=/kannich/jdk
 
 # Create Kannich directories
-RUN mkdir -p /kannich/cache /kannich/overlays /workspace /root/.m2/repository
+RUN mkdir -p /kannich/cache /kannich/overlays /workspace
 
 # Copy Kannich CLI jar
 COPY kannich-cli.jar /kannich/kannich-cli.jar
-
-# Copy pre-built Kannich libraries for offline builds
-# (These are populated from local .m2 during bootstrap)
-COPY m2-repo/ /root/.m2/repository/
 
 # Copy helper scripts
 COPY scripts/ /kannich/scripts/
