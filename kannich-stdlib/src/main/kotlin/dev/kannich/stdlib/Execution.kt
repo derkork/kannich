@@ -23,8 +23,9 @@ class ExecutionBuilder(private val name: String) {
 
     /**
      * Read-only access to environment variables at execution definition time.
+     * Includes both system env vars and extra env vars passed via `-e` CLI args.
      */
-    fun getEnv(name: String): String? = System.getenv(name)
+    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
@@ -56,8 +57,9 @@ class SequentialBuilder {
 
     /**
      * Read-only access to environment variables at execution definition time.
+     * Includes both system env vars and extra env vars passed via `-e` CLI args.
      */
-    fun getEnv(name: String): String? = System.getenv(name)
+    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
 
     fun job(job: Job) {
@@ -82,8 +84,9 @@ class ParallelBuilder {
 
     /**
      * Read-only access to environment variables at execution definition time.
+     * Includes both system env vars and extra env vars passed via `-e` CLI args.
      */
-    fun getEnv(name: String): String? = System.getenv(name)
+    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))

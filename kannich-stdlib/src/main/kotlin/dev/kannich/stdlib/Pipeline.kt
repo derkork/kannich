@@ -19,8 +19,9 @@ class PipelineBuilder {
 
     /**
      * Read-only access to environment variables at pipeline definition time.
+     * Includes both system env vars and extra env vars passed via `-e` CLI args.
      */
-    fun getEnv(name: String): String? = System.getenv(name)
+    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
     /**
      * Defines a job with the given name and execution block.

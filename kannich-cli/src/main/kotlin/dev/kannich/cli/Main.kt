@@ -18,6 +18,7 @@ import dev.kannich.core.docker.KannichDockerClient
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
 import dev.kannich.stdlib.Pipeline
+import dev.kannich.stdlib.PipelineEnv
 import org.slf4j.LoggerFactory
 import java.io.File
 import kotlin.system.exitProcess
@@ -61,10 +62,30 @@ class KannichCommand : CliktCommand(name = "kannich") {
         }
         logger.info("Docker: ${dockerClient.version()}")
 
+        // Parse -e KEY=VALUE arguments into a map (split at first =)
+        // This is done before script evaluation so getEnv() in builders can see these values
+        val extraEnv = envVars.mapNotNull { envVar ->
+            val idx = envVar.indexOf('=')
+            if (idx > 0) {
+                val key = envVar.substring(0, idx)
+                val value = envVar.substring(idx + 1)
+                key to value
+            } else {
+                logger.warn("Invalid environment variable format (expected KEY=VALUE): $envVar")
+                null
+            }
+        }.toMap()
+
+        // Set extra env vars for pipeline definition (see PipelineEnv for why)
+        PipelineEnv.setExtraEnv(extraEnv)
+
         // Parse the script
         logger.info("Loading pipeline from $kannichFile...")
         val scriptHost = KannichScriptHost()
         val result = scriptHost.evaluate(scriptFile)
+
+        // Clear extra env vars after evaluation
+        PipelineEnv.clear()
 
         val pipeline = result.getOrElse { error ->
             logger.error("Error loading pipeline: ${error.message}")
@@ -89,20 +110,6 @@ class KannichCommand : CliktCommand(name = "kannich") {
         logger.info("Running execution: $execution")
 
         val containerManager = ContainerManager(dockerClient)
-
-        // Parse -e KEY=VALUE arguments into a map (split at first =)
-        val extraEnv = envVars.mapNotNull { envVar ->
-            val idx = envVar.indexOf('=')
-            if (idx > 0) {
-                val key = envVar.substring(0, idx)
-                val value = envVar.substring(idx + 1)
-                key to value
-            } else {
-                logger.warn("Invalid environment variable format (expected KEY=VALUE): $envVar")
-                null
-            }
-        }.toMap()
-
         val executionEngine = ExecutionEngine(containerManager, File(artifactsDir), extraEnv)
 
         try {
