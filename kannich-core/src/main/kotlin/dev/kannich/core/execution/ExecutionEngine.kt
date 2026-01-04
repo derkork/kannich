@@ -37,14 +37,10 @@ class ExecutionEngine(
         val execution = pipeline.executions[executionName]
             ?: throw IllegalArgumentException("Execution not found: $executionName")
 
-        logger.info("Starting execution: $executionName")
         containerManager.initialize()
 
-        return try {
+        return containerManager.use { _ ->
             executeSteps(execution.steps, pipeline)
-        } finally {
-            logger.info("Execution finished: $executionName")
-            containerManager.close()
         }
     }
 
