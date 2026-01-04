@@ -15,7 +15,6 @@ import com.github.ajalt.clikt.parameters.options.option
 import dev.kannich.core.Kannich
 import dev.kannich.core.docker.ContainerManager
 import dev.kannich.core.docker.KannichDockerClient
-import dev.kannich.core.dsl.KannichContext
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
 import dev.kannich.stdlib.Pipeline
@@ -64,9 +63,8 @@ class KannichCommand : CliktCommand(name = "kannich") {
 
         // Parse the script
         logger.info("Loading pipeline from $kannichFile...")
-        val context = KannichContext()
         val scriptHost = KannichScriptHost()
-        val result = scriptHost.evaluate(scriptFile, context)
+        val result = scriptHost.evaluate(scriptFile)
 
         val pipeline = result.getOrElse { error ->
             logger.error("Error loading pipeline: ${error.message}")
@@ -90,18 +88,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // Run the execution
         logger.info("Running execution: $execution")
 
-        // Use host paths for Docker mounts (needed when running inside wrapper container)
-        // These are already in Docker format (e.g., /d/foo/bar) so don't wrap in File
-        val hostProjectPath = System.getenv("KANNICH_HOST_PROJECT_DIR")
-        val hostCachePath = System.getenv("KANNICH_HOST_CACHE_DIR")
-
-        val containerManager = ContainerManager(
-            dockerClient,
-            projectDir,
-            context.cacheDir,
-            hostProjectPath,
-            hostCachePath
-        )
+        val containerManager = ContainerManager(dockerClient)
 
         // Parse -e KEY=VALUE arguments into a map (split at first =)
         val extraEnv = envVars.mapNotNull { envVar ->

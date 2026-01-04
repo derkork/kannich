@@ -35,9 +35,6 @@ object KannichScriptCompilationConfiguration : ScriptCompilationConfiguration({
     // Enable @file:DependsOn and @file:Repository annotations
     defaultImports(DependsOn::class, Repository::class)
 
-    // Provide 'kannich' as a script property for accessing build context
-    providedProperties("kannich" to KannichContext::class)
-
     // Include kannich-core on the classpath (stdlib resolved via @DependsOn)
     jvm {
         dependenciesFromCurrentContext(wholeClasspath = true)
@@ -49,9 +46,7 @@ object KannichScriptCompilationConfiguration : ScriptCompilationConfiguration({
     }
 })
 
-object KannichScriptEvaluationConfiguration : ScriptEvaluationConfiguration({
-    // The 'kannich' property is provided at evaluation time via providedProperties
-})
+object KannichScriptEvaluationConfiguration : ScriptEvaluationConfiguration({})
 
 private val logger = LoggerFactory.getLogger(KannichScript::class.java)
 

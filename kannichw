@@ -135,7 +135,6 @@ trap cleanup EXIT INT TERM
 # Run Kannich inside Docker
 # --init: Use tini for proper signal handling and zombie reaping
 # --name: Named container for cleanup on Ctrl+C
-# Pass host paths as environment variables for nested container mounts
 # shellcheck disable=SC2086
 docker run --rm -it \
     --init \
@@ -143,8 +142,6 @@ docker run --rm -it \
     -v "$PROJECT_DOCKER_PATH:/workspace" \
     -v "$CACHE_DOCKER_PATH:/kannich/cache" \
     $DOCKER_SOCKET_MOUNT \
-    -e "KANNICH_HOST_PROJECT_DIR=$PROJECT_DOCKER_PATH" \
-    -e "KANNICH_HOST_CACHE_DIR=$CACHE_DOCKER_PATH" \
     $ENV_ARGS \
     -w /workspace \
     "$KANNICH_IMAGE" \

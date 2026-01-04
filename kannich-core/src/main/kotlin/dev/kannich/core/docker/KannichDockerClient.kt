@@ -86,30 +86,72 @@ class KannichDockerClient(
     }
 
     /**
+     * Discovers the host paths for project and cache directories by inspecting
+     * the current container's mounts.
+     *
+     * WHY THIS EXISTS:
+     * The orchestration container (started by kannichw) has /workspace and /kannich/cache
+     * mounted from the host. When creating the build container, we need to pass the
+     * original HOST paths to Docker (not /workspace), because Docker daemon runs on
+     * the host and doesn't understand container-internal paths.
+     *
+     * Rather than requiring users to pass these paths via environment variables
+     * (KANNICH_HOST_PROJECT_DIR, KANNICH_HOST_CACHE_DIR), we discover them automatically
+     * by inspecting our own container's mount configuration via Docker API.
+     *
+     * @return Pair of (projectHostPath, cacheHostPath)
+     * @throws IllegalStateException if not running in a container or mounts not found
+     */
+    fun discoverHostPaths(): Pair<String, String> {
+        val containerId = System.getenv("HOSTNAME")
+            ?: throw IllegalStateException(
+                "Kannich must be run inside a container. Use the wrapper script: ./kannichw <execution>"
+            )
+
+        val inspection = try {
+            dockerClient.inspectContainerCmd(containerId).exec()
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Cannot inspect container '$containerId'. Is Docker socket mounted? Error: ${e.message}"
+            )
+        }
+
+        val mounts = inspection.mounts
+            ?: throw IllegalStateException("Cannot inspect container mounts. Is Docker socket mounted?")
+
+        val projectMount = mounts.find { it.destination?.path == "/workspace" }
+            ?: throw IllegalStateException("Project directory not mounted at /workspace. Use the wrapper script.")
+        val cacheMount = mounts.find { it.destination?.path == "/kannich/cache" }
+            ?: throw IllegalStateException("Cache directory not mounted at /kannich/cache. Use the wrapper script.")
+
+        val projectPath = projectMount.source
+            ?: throw IllegalStateException("Project mount has no source path")
+        val cachePath = cacheMount.source
+            ?: throw IllegalStateException("Cache mount has no source path")
+
+        logger.debug("Discovered host paths: project=$projectPath, cache=$cachePath")
+        return Pair(projectPath, cachePath)
+    }
+
+    /**
      * Creates a new build container with the project directory mounted.
      */
     fun createBuildContainer(
-        projectDir: File,
-        cacheDir: File,
         workingDir: String = "/workspace",
-        hostProjectPath: String? = null,
-        hostCachePath: String? = null
+        hostProjectPath: String,
+        hostCachePath: String
     ): String {
         // Mount project directory and cache
         val projectVolume = Volume(workingDir)
         val cacheVolume = Volume("/kannich/cache")
 
-        // Use provided host paths or convert from File paths
-        val projectPath = hostProjectPath ?: convertToDockerPath(projectDir.absolutePath)
-        val cachePath = hostCachePath ?: convertToDockerPath(cacheDir.absolutePath)
-
-        logger.debug("Mounting project: $projectPath -> $workingDir")
-        logger.debug("Mounting cache: $cachePath -> /kannich/cache")
+        logger.debug("Mounting project: $hostProjectPath -> $workingDir")
+        logger.debug("Mounting cache: $hostCachePath -> /kannich/cache")
 
         // Build list of bind mounts
         val binds = mutableListOf(
-            Bind(projectPath, projectVolume),
-            Bind(cachePath, cacheVolume)
+            Bind(hostProjectPath, projectVolume),
+            Bind(hostCachePath, cacheVolume)
         )
 
         // Add Docker socket mount if needed (for nested container support)
@@ -351,21 +393,6 @@ class KannichDockerClient(
                 "/var/run/docker.sock"
             }
         }
-    }
-
-    /**
-     * Converts a Windows path to Docker-compatible format.
-     * E.g., "D:\foo\bar" -> "/d/foo/bar" for Docker Desktop on Windows.
-     */
-    private fun convertToDockerPath(path: String): String {
-        // Check if this is a Windows path (e.g., D:\foo\bar)
-        if (path.length >= 2 && path[1] == ':') {
-            val driveLetter = path[0].lowercaseChar()
-            val remainder = path.substring(2).replace('\\', '/')
-            return "/$driveLetter$remainder"
-        }
-        // Already Unix-style or relative
-        return path.replace('\\', '/')
     }
 
     companion object {

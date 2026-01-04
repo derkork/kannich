@@ -16,11 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Thread-safe and idempotent for proper shutdown handling.
  */
 class ContainerManager(
-    private val client: KannichDockerClient,
-    private val projectDir: File,
-    private val cacheDir: File,
-    private val hostProjectPath: String? = null,
-    private val hostCachePath: String? = null
+    private val client: KannichDockerClient
 ) : Closeable {
 
     private val logger = LoggerFactory.getLogger(ContainerManager::class.java)
@@ -46,7 +42,11 @@ class ContainerManager(
     fun initialize() {
         logger.info("Initializing build container...")
         client.ensureBuilderImage()
-        val id = client.createBuildContainer(projectDir, cacheDir, "/workspace", hostProjectPath, hostCachePath)
+
+        // Discover host paths for Docker mounts (see KannichDockerClient.discoverHostPaths for why)
+        val (hostProjectPath, hostCachePath) = client.discoverHostPaths()
+
+        val id = client.createBuildContainer("/workspace", hostProjectPath, hostCachePath)
         containerIdRef.set(id)
         client.startContainer(id)
         isStarted.set(true)
@@ -68,8 +68,7 @@ class ContainerManager(
         val projectCheck = exec(listOf("test", "-d", containerProjectDir), silent = true)
         if (!projectCheck.success) {
             throw IllegalStateException(
-                "Project directory mount failed: $containerProjectDir is not accessible in container. " +
-                "Host path: ${hostProjectPath ?: projectDir.absolutePath}"
+                "Project directory mount failed: $containerProjectDir is not accessible in container."
             )
         }
 
@@ -77,9 +76,7 @@ class ContainerManager(
         val cacheCheck = exec(listOf("test", "-d", containerCacheDir), silent = true)
         if (!cacheCheck.success) {
             throw IllegalStateException(
-                "Cache directory mount failed: $containerCacheDir is not accessible in container. " +
-                "Host path: ${hostCachePath ?: cacheDir.absolutePath}. " +
-                "Ensure the cache directory exists on the host before starting."
+                "Cache directory mount failed: $containerCacheDir is not accessible in container."
             )
         }
 
@@ -90,8 +87,7 @@ class ContainerManager(
         )
         if (!writeCheck.success) {
             throw IllegalStateException(
-                "Cache directory is not writable: $containerCacheDir. " +
-                "Check permissions on host path: ${hostCachePath ?: cacheDir.absolutePath}"
+                "Cache directory is not writable: $containerCacheDir."
             )
         }
 

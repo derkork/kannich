@@ -12,7 +12,7 @@ import kotlin.script.experimental.jvmhost.createJvmCompilationConfigurationFromT
 
 /**
  * Compiles and evaluates Kannich script files (.kannichfile.main.kts).
- * Handles Maven dependency resolution and provides runtime context.
+ * Handles Maven dependency resolution.
  */
 class KannichScriptHost {
     private val logger: Logger = LoggerFactory.getLogger(KannichScriptHost::class.java)
@@ -24,19 +24,15 @@ class KannichScriptHost {
      * The script's last expression should be a pipeline {} call.
      * Caller should cast the result to dev.kannich.stdlib.Pipeline.
      */
-    fun evaluate(scriptFile: File, context: KannichContext): Result<Any> {
+    fun evaluate(scriptFile: File): Result<Any> {
         require(scriptFile.exists()) { "Script file not found: $scriptFile" }
 
         val compilationConfig = createJvmCompilationConfigurationFromTemplate<KannichScript>()
 
-        val evaluationConfig = ScriptEvaluationConfiguration {
-            providedProperties("kannich" to context)
-        }
-
         val result = scriptingHost.eval(
             scriptFile.toScriptSource(),
             compilationConfig,
-            evaluationConfig
+            null
         )
 
         return extractResult(result)
@@ -45,17 +41,13 @@ class KannichScriptHost {
     /**
      * Evaluates script content directly (useful for testing).
      */
-    fun evaluateScript(script: String, context: KannichContext): Result<Any> {
+    fun evaluateScript(script: String): Result<Any> {
         val compilationConfig = createJvmCompilationConfigurationFromTemplate<KannichScript>()
-
-        val evaluationConfig = ScriptEvaluationConfiguration {
-            providedProperties("kannich" to context)
-        }
 
         val result = scriptingHost.eval(
             script.toScriptSource(),
             compilationConfig,
-            evaluationConfig
+            null
         )
 
         return extractResult(result)

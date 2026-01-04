@@ -6,7 +6,7 @@ REM Commit this file with your project to enable portable CI builds.
 setlocal enabledelayedexpansion
 
 REM Configuration
-if "%KANNICH_VERSION%"=="" set KANNICH_VERSION=latest
+if "%KANNICH_VERSION%"=="" set KANNICH_VERSION=0.1.0
 set KANNICH_IMAGE=derkork/kannich:%KANNICH_VERSION%
 if "%KANNICH_CACHE_DIR%"=="" set KANNICH_CACHE_DIR=%USERPROFILE%\.kannich\cache
 
@@ -150,15 +150,12 @@ if defined DOCKER_HOST (
 REM Run Kannich inside Docker
 REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
-REM Pass host paths as environment variables for nested container mounts
 docker run --rm -it ^
     --init ^
     --name %CONTAINER_NAME% ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
     %DOCKER_SOCKET_MOUNT% ^
-    -e "KANNICH_HOST_PROJECT_DIR=%PROJECT_DOCKER_PATH%" ^
-    -e "KANNICH_HOST_CACHE_DIR=%CACHE_DOCKER_PATH%" ^
     %ENV_ARGS% ^
     -w /workspace ^
     %KANNICH_IMAGE% ^
