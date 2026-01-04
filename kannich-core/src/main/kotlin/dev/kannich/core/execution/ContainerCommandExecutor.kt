@@ -9,8 +9,7 @@ import java.io.InputStream
  * CommandExecutor implementation that executes commands in a Docker container.
  */
 class ContainerCommandExecutor(
-    private val containerManager: ContainerManager,
-    private val defaultWorkingDir: String
+    private val containerManager: ContainerManager
 ) : CommandExecutor {
 
     override fun exec(

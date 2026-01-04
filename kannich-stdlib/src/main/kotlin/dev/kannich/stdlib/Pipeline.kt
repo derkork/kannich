@@ -1,7 +1,5 @@
 package dev.kannich.stdlib
 
-import dev.kannich.stdlib.Env
-
 /**
  * Entry point for defining Kannich pipelines.
  */
@@ -22,7 +20,7 @@ class PipelineBuilder {
     /**
      * Read-only access to environment variables at pipeline definition time.
      */
-    val env: Env = Env(System.getenv())
+    fun getEnv(name: String): String? = System.getenv(name)
 
     /**
      * Defines a job with the given name and execution block.

@@ -1,6 +1,6 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.currentJobScope
+import dev.kannich.stdlib.context.currentJobContext
 import dev.kannich.stdlib.fail
 
 /**
@@ -22,7 +22,7 @@ object Web {
         val tempDir = Fs.mktemp("download")
 
         // Cleanup on job end
-        currentJobScope().onCleanup { Fs.delete(tempDir) }
+        currentJobContext().onCleanup { Fs.delete(tempDir) }
 
         // Determine filename
         val actualFilename = filename
@@ -73,7 +73,7 @@ object Web {
         }
 
         // Cleanup when job ends
-        currentJobScope().onCleanup { Fs.delete(outputPath) }
+        currentJobContext().onCleanup { Fs.delete(outputPath) }
 
         return outputPath
     }

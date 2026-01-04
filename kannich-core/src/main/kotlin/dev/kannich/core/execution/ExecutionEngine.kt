@@ -11,15 +11,12 @@ import dev.kannich.stdlib.JobScope
 import dev.kannich.stdlib.ParallelSteps
 import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
-import dev.kannich.stdlib.context.JobExecutionContext
-import dev.kannich.stdlib.context.PipelineContext
+import dev.kannich.stdlib.context.JobContext
 import dev.kannich.stdlib.timedSuspend
 import dev.kannich.stdlib.tools.Fs
-import dev.kannich.stdlib.tools.JobEnvContext
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
-import kotlin.coroutines.CoroutineContext
 
 /**
  * Executes Kannich pipelines inside Docker containers.
@@ -170,38 +167,34 @@ class ExecutionEngine(
         val layerId = containerManager.createJobLayer(parentLayerId)
         val workDir = containerManager.getLayerWorkDir(layerId)
 
-        // Create execution context - paths come from ContainerManager
-        // Merge system env with extra env (extra env takes precedence)
-        val pipelineCtx = PipelineContext(
+        // Create job context
+        val executor = ContainerCommandExecutor(containerManager)
+        val jobCtx = JobContext(
             cacheDir = containerManager.containerCacheDir,
             projectDir = containerManager.containerProjectDir,
-            env = System.getenv() + extraEnv
+            env = System.getenv() + extraEnv,
+            executor = executor,
+            workingDir = workDir
         )
-        val executor = ContainerCommandExecutor(containerManager, workDir)
-        val jobCtx = JobExecutionContext(pipelineCtx, executor, workDir)
 
-        // Create job environment context for this job
-        val jobEnvCtx = JobEnvContext()
-
-        // Build coroutine context with all context elements
-        // Context is automatically available via currentCoroutineContext() in suspend functions
-        val coroutineContext: CoroutineContext = pipelineCtx + jobCtx + jobEnvCtx
 
         // Execute job block with context
         var success = true
         var output = ""
+        val scope = JobScope(job.name)
 
         try {
-            // Use runBlocking with context elements - context propagates automatically
-            runBlocking(coroutineContext) {
-                val scopeResult = timedSuspend("Job ${job.name}") {
-                    JobScope.withScope(job.name) { job.block(this) }
+            // Context is automatically available via currentJobContext() in suspend functions
+            runBlocking(jobCtx) {
+                timedSuspend("Job ${job.name}") {
+                    job.block(scope)
                 }
 
                 // Collect artifacts while still in context (so Fs.glob works)
-                if (scopeResult.artifacts.isNotEmpty()) {
+                val artifacts = scope.getArtifactSpecs()
+                if (artifacts.isNotEmpty()) {
                     timedSuspend("Collecting artifacts") {
-                        for (spec in scopeResult.artifacts) {
+                        for (spec in artifacts) {
                             collectArtifacts(spec, workDir)
                         }
                     }
@@ -215,6 +208,11 @@ class ExecutionEngine(
             logger.error("Unexpected error in job: ${e.message}", e)
             success = false
             output = "Unexpected error: ${e.message}"
+        } finally {
+            // Run cleanup actions regardless of job success/failure
+            runBlocking(jobCtx) {
+                jobCtx.runCleanup()
+            }
         }
 
         val result = JobResult(

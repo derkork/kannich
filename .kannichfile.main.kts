@@ -16,10 +16,10 @@ pipeline {
 
     val deploy = job("deploy") {
         // fail fast, verify required variables
-        val dockerUsername = env["KANNICH_DOCKER_USERNAME"] ?: fail("Please specify username for docker login in KANNICH_DOCKER_USERNAME")
-        val dockerPassword = env["KANNICH_DOCKER_PASSWORD"] ?: fail("Please specify password/token for docker login in KANNICH_DOCKER_PASSWORD")
-        val version = env["KANNICH_VERSION"] ?: fail("Please specify release version in KANNICH_VERSION.")
-        val isLatest = env["KANNICH_IS_LATEST"] ?: "true"
+        val dockerUsername = getEnv("KANNICH_DOCKER_USERNAME") ?: fail("Please specify username for docker login in KANNICH_DOCKER_USERNAME")
+        val dockerPassword = getEnv("KANNICH_DOCKER_PASSWORD") ?: fail("Please specify password/token for docker login in KANNICH_DOCKER_PASSWORD")
+        val version = getEnv("KANNICH_VERSION") ?: fail("Please specify release version in KANNICH_VERSION.")
+        val isLatest = getEnv("KANNICH_IS_LATEST") ?: "true"
 
         // check docker login.
         Docker.login(dockerUsername, dockerPassword)
@@ -48,8 +48,9 @@ pipeline {
     execution("test") {
         job("test") {
             secret("World!")
+            logger.info("Getenv: ${getEnv("NOOT")}")
             Shell.execShell("echo 'Hello World!'")
-            log.info("Hello World!")
+            logger.info("Hello World!")
         }
     }
 }

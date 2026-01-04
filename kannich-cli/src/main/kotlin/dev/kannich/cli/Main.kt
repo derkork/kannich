@@ -64,7 +64,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
 
         // Parse the script
         logger.info("Loading pipeline from $kannichFile...")
-        val context = KannichContext(projectDir)
+        val context = KannichContext()
         val scriptHost = KannichScriptHost()
         val result = scriptHost.evaluate(scriptFile, context)
 

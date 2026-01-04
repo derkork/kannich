@@ -1,6 +1,6 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.currentJobExecutionContext
+import dev.kannich.stdlib.context.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.AntPathMatcher
 import org.slf4j.LoggerFactory
@@ -148,7 +148,7 @@ object Fs {
         if (parent.isNotEmpty()) {
             mkdir(parent)
         }
-        val ctx = currentJobExecutionContext()
+        val ctx = currentJobContext()
         // Make path absolute if it's relative
         val absolutePath = if (path.startsWith("/")) path else "${ctx.workingDir}/$path"
         if (append) {

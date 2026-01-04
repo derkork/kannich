@@ -1,7 +1,5 @@
 package dev.kannich.stdlib
 
-import dev.kannich.stdlib.Env
-
 /**
  * Represents an execution plan that orchestrates jobs.
  */
@@ -26,7 +24,7 @@ class ExecutionBuilder(private val name: String) {
     /**
      * Read-only access to environment variables at execution definition time.
      */
-    val env: Env = Env(System.getenv())
+    fun getEnv(name: String): String? = System.getenv(name)
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
@@ -59,7 +57,8 @@ class SequentialBuilder {
     /**
      * Read-only access to environment variables at execution definition time.
      */
-    val env: Env = Env(System.getenv())
+    fun getEnv(name: String): String? = System.getenv(name)
+
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
@@ -84,7 +83,7 @@ class ParallelBuilder {
     /**
      * Read-only access to environment variables at execution definition time.
      */
-    val env: Env = Env(System.getenv())
+    fun getEnv(name: String): String? = System.getenv(name)
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))

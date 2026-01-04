@@ -2,7 +2,7 @@ package dev.kannich.gpg
 
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.context.currentJobExecutionContext
+import dev.kannich.stdlib.context.currentJobContext
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -50,7 +50,7 @@ object Gpg {
             fail("GPG key cannot be empty")
         }
 
-        val ctx = currentJobExecutionContext()
+        val ctx = currentJobContext()
         val tempKeyFile = "${ctx.workingDir}/.kannich/gpg-key-${System.currentTimeMillis()}.asc"
 
         try {
@@ -77,7 +77,7 @@ object Gpg {
      * @throws dev.kannich.stdlib.JobFailedException if import fails or file doesn't exist
      */
     suspend fun importKeyFile(path: String, deleteAfterImport: Boolean = false) {
-        val ctx = currentJobExecutionContext()
+        val ctx = currentJobContext()
 
         // Resolve path relative to workspace if not absolute
         val keyPath = if (path.startsWith("/")) {

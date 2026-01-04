@@ -3,8 +3,7 @@ package dev.kannich.stdlib.context
 import java.io.InputStream
 
 /**
- * Interface for executing commands.
- * Implemented by kannich-core to execute commands in containers.
+ * Interface for executing commands. This is the low-level API that the stdlib uses to perform actual work.
  */
 interface CommandExecutor {
     /**

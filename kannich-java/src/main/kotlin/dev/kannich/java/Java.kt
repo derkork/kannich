@@ -1,5 +1,6 @@
 package dev.kannich.java
 
+import dev.kannich.stdlib.context.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor
@@ -74,8 +75,9 @@ class Java(val version: String) {
     suspend fun exec(vararg args: String) {
         ensureInstalled()
         val homeDir = home()
-        val env = mapOf("JAVA_HOME" to homeDir)
-        val result = Shell.exec("$homeDir/bin/java", *args, env = env)
+        val result = currentJobContext().withEnv( mapOf("JAVA_HOME" to homeDir)) {
+            Shell.exec("$homeDir/bin/java", *args)
+        }
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")

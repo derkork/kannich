@@ -2,11 +2,10 @@ package dev.kannich.maven
 
 import dev.kannich.java.Java
 import dev.kannich.stdlib.KannichDsl
-import dev.kannich.stdlib.currentJobScope
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.context.currentJobExecutionContext
+import dev.kannich.stdlib.context.currentJobContext
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
@@ -150,17 +149,12 @@ class Maven(
 
         val homeDir = home()
         val javaHome = java.home()
-        val env = mapOf(
-            "JAVA_HOME" to javaHome,
-            "MAVEN_HOME" to homeDir,
-            "M2_HOME" to homeDir
-        )
 
         // Build command with settings.xml if servers are configured
         val settingsArgs = if (servers.isNotEmpty()) {
             val settingsPath = generateSettingsXml()
             // Register cleanup to delete settings.xml when job completes
-            currentJobScope().onCleanup {
+            currentJobContext().onCleanup {
                 Fs.delete(settingsPath)
             }
             listOf("-s", settingsPath)
@@ -174,7 +168,17 @@ class Maven(
 
         val allArgs = listOf("-Dmaven.repo.local=${Cache.path(repositoryCacheKey)}") +
                       settingsArgs + args.toList()
-        val result = Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), env = env)
+
+        val env = mapOf(
+            "JAVA_HOME" to javaHome,
+            "MAVEN_HOME" to homeDir,
+            "M2_HOME" to homeDir
+        )
+
+        val result = currentJobContext().withEnv(env) {
+            Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray())
+        }
+
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")
@@ -186,7 +190,7 @@ class Maven(
      * Returns the path to the generated file.
      */
     private suspend fun generateSettingsXml(): String {
-        val ctx = currentJobExecutionContext()
+        val ctx = currentJobContext()
         val settingsPath = "${ctx.workingDir}/.kannich/settings.xml"
 
         val xml = buildString {
