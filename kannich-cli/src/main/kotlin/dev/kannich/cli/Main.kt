@@ -13,7 +13,6 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import dev.kannich.core.Version
-import dev.kannich.core.execution.LayerManager
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
 import dev.kannich.stdlib.*
@@ -118,7 +117,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         try {
             val executionResult = executionEngine.runExecution(pipeline, execution!!)
 
-            if (executionResult.success) {
+            if (executionResult) {
                 logger.info("Execution completed successfully.")
             } else {
                 logger.error("Execution failed.")

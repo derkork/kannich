@@ -1,5 +1,6 @@
 package dev.kannich.stdlib.tools
 
+import dev.kannich.stdlib.Kannich
 import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 
@@ -28,8 +29,7 @@ object Cache {
      * @return The full path to the cached item
      */
     suspend fun path(key: String): String {
-        val ctx = currentJobContext()
-        return "${ctx.cacheDir}/$key"
+        return "${Kannich.CACHE_DIR}/$key"
     }
 
     /**
@@ -38,8 +38,7 @@ object Cache {
      * @return The cache directory path
      */
     suspend fun baseDir(): String {
-        val ctx = currentJobContext()
-        return ctx.cacheDir
+       return Kannich.CACHE_DIR
     }
 
     /**

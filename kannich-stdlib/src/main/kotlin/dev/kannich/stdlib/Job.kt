@@ -8,7 +8,7 @@ package dev.kannich.stdlib
  * within the job block.
  */
 class Job internal constructor(
-    val name: String,
+    val name: String?,
     val description: String? = null,
     val block: suspend JobScope.() -> Unit
 )
@@ -17,7 +17,7 @@ class Job internal constructor(
  * Builder for constructing Job instances.
  */
 @KannichDsl
-class JobBuilder(private val name: String, private val description: String? = null) {
+class JobBuilder(private val name: String? = null, private val description: String? = null) {
     private var jobBlock: (suspend JobScope.() -> Unit)? = null
 
     internal fun setBlock(block: suspend JobScope.() -> Unit) {

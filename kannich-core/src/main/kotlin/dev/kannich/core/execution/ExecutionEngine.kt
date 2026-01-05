@@ -7,7 +7,6 @@ import dev.kannich.stdlib.Job
 import dev.kannich.stdlib.JobExecutionStep
 import dev.kannich.stdlib.JobFailedException
 import dev.kannich.stdlib.JobScope
-import dev.kannich.stdlib.Kannich
 import dev.kannich.stdlib.ParallelSteps
 import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
@@ -29,12 +28,11 @@ class ExecutionEngine(
     private val extraEnv: Map<String, String> = emptyMap()
 ) {
     private val logger = LoggerFactory.getLogger(ExecutionEngine::class.java)
-    private val jobResults = mutableMapOf<String, JobResult>()
 
     /**
      * Runs a named execution from the pipeline.
      */
-    fun runExecution(pipeline: Pipeline, executionName: String): ExecutionResult {
+    fun runExecution(pipeline: Pipeline, executionName: String): Boolean {
         val execution = pipeline.executions[executionName]
             ?: throw IllegalArgumentException("Execution not found: $executionName")
 
@@ -46,7 +44,7 @@ class ExecutionEngine(
         steps: List<ExecutionStep>,
         pipeline: Pipeline,
         parentLayerId: String? = null
-    ): ExecutionResult {
+    ): Boolean {
         var currentLayerId = parentLayerId
         val layersToCleanup = mutableListOf<String>()
 
@@ -55,7 +53,7 @@ class ExecutionEngine(
                 val result = when (step) {
                     is JobExecutionStep -> {
                         val (execResult, newLayerId) = executeJob(step.job, currentLayerId)
-                        if (execResult.success && newLayerId != null) {
+                        if (execResult && newLayerId != null) {
                             // Track old layer for cleanup, use new layer for next job
                             currentLayerId?.let { layersToCleanup.add(it) }
                             currentLayerId = newLayerId
@@ -72,15 +70,12 @@ class ExecutionEngine(
                     is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
                 }
 
-                if (!result.success) {
+                if (!result) {
                     return result
                 }
             }
 
-            return ExecutionResult(
-                success = true,
-                jobResults = jobResults.toMap()
-            )
+            return true
         } finally {
             // Cleanup intermediate layers
             layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
@@ -93,7 +88,7 @@ class ExecutionEngine(
         steps: List<ExecutionStep>,
         pipeline: Pipeline,
         parentLayerId: String? = null
-    ): ExecutionResult {
+    ): Boolean {
         var currentLayerId = parentLayerId
         val layersToCleanup = mutableListOf<String>()
 
@@ -102,7 +97,7 @@ class ExecutionEngine(
                 val result = when (step) {
                     is JobExecutionStep -> {
                         val (execResult, newLayerId) = executeJob(step.job, currentLayerId)
-                        if (execResult.success && newLayerId != null) {
+                        if (execResult && newLayerId != null) {
                             currentLayerId?.let { layersToCleanup.add(it) }
                             currentLayerId = newLayerId
                         }
@@ -114,11 +109,11 @@ class ExecutionEngine(
                     is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
                 }
 
-                if (!result.success) {
+                if (!result) {
                     return result
                 }
             }
-            return ExecutionResult(success = true, jobResults = jobResults.toMap())
+            return true
         } finally {
             layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
             currentLayerId?.let { LayerManager.removeJobLayer(it) }
@@ -129,7 +124,7 @@ class ExecutionEngine(
         steps: List<ExecutionStep>,
         pipeline: Pipeline,
         parentLayerId: String? = null
-    ): ExecutionResult {
+    ): Boolean {
         // Parallel jobs each get their own layer branching from the same parent
         val results = runBlocking {
             steps.map { step ->
@@ -143,18 +138,15 @@ class ExecutionEngine(
                 }
             }.awaitAll()
         }
-
-        val failed = results.any { !it.success }
-        return ExecutionResult(success = !failed, jobResults = jobResults.toMap())
+        // success if all children succeeded
+        return results.all { it }
     }
 
     /**
      * Executes a job in its own layer.
-     * Returns the execution result and the layer ID (for chaining to subsequent jobs).
-     *
-     * Context elements are passed to the coroutine and accessed via currentCoroutineContext().
+     * Returns the execution result and the layer ID (for chaining to following jobs).
      */
-    private fun executeJob(job: Job, parentLayerId: String? = null): Pair<ExecutionResult, String?> {
+    private fun executeJob(job: Job, parentLayerId: String? = null): Pair<Boolean, String?> {
         logger.info("Running job: ${job.name}")
 
         // Create job layer from parent (or workspace if no parent)
@@ -163,8 +155,6 @@ class ExecutionEngine(
 
         // Create job context
         val jobCtx = JobContext(
-            cacheDir = Kannich.CACHE_DIR,
-            projectDir = Kannich.WORKSPACE_DIR,
             env = System.getenv() + extraEnv,
             workingDir = workDir
         )
@@ -172,7 +162,6 @@ class ExecutionEngine(
 
         // Execute job block with context
         var success = true
-        var output = ""
         val scope = JobScope(job.name)
 
         try {
@@ -195,11 +184,9 @@ class ExecutionEngine(
         } catch (e: JobFailedException) {
             logger.warn("Job failed: ${e.message}")
             success = false
-            output = e.message ?: "Job failed"
         } catch (e: Exception) {
             logger.error("Unexpected error in job: ${e.message}", e)
             success = false
-            output = "Unexpected error: ${e.message}"
         } finally {
             // Run cleanup actions regardless of job success/failure
             runBlocking(jobCtx) {
@@ -207,21 +194,12 @@ class ExecutionEngine(
             }
         }
 
-        val result = JobResult(
-            name = job.name,
-            success = success,
-            output = output
-        )
-        jobResults[job.name] = result
-
-        val execResult = ExecutionResult(success = success, jobResults = mapOf(job.name to result))
-
         // Return layer ID only on success (for chaining), cleanup handled by caller
         return if (success) {
-            Pair(execResult, layerId)
+            Pair(true, layerId)
         } else {
             LayerManager.removeJobLayer(layerId)
-            Pair(execResult, null)
+            Pair(false, null)
         }
     }
 
@@ -263,12 +241,9 @@ class ExecutionEngine(
 }
 
 data class ExecutionResult(
-    val success: Boolean,
-    val jobResults: Map<String, JobResult>
+    val success: Boolean
 )
 
 data class JobResult(
-    val name: String,
-    val success: Boolean,
-    val output: String
+    val success: Boolean
 )

@@ -6,7 +6,7 @@ package dev.kannich.stdlib
  * methods that delegate to the underlying JobContext.
  */
 @KannichDsl
-class JobScope(name: String): Logging by LoggingImpl("Job $name") {
+class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) " $name" else ""}") {
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
 
     /**

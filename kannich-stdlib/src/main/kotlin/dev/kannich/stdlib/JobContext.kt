@@ -11,8 +11,6 @@ import kotlin.coroutines.CoroutineContext
  * Can be accessed via [currentJobContext].
  */
 class JobContext(
-    val cacheDir: String,
-    val projectDir: String,
     val env: Map<String, String> = mapOf(),
     val workingDir: String,
     private val cleanupActions: MutableList<suspend () -> Unit> = mutableListOf()
@@ -53,8 +51,6 @@ class JobContext(
         }
 
         val newCtx = JobContext(
-            cacheDir = cacheDir,
-            projectDir = projectDir,
             env = env,
             workingDir = newWorkingDir,
             cleanupActions = cleanupActions
@@ -82,8 +78,6 @@ class JobContext(
         }
 
         val newCtx = JobContext(
-            cacheDir = cacheDir,
-            projectDir = projectDir,
             env = newEnv,
             workingDir = workingDir,
             cleanupActions = cleanupActions
