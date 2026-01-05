@@ -130,6 +130,36 @@ if [ -n "$DOCKER_CERT_PATH" ]; then
     DOCKER_CERT_MOUNT="-v $DOCKER_CERT_PATH:$DOCKER_CERT_PATH"
 fi
 
+# If DOCKER_HOST is tcp://, resolve hostname to IP for container use
+# This avoids DNS resolution issues inside the container
+DOCKER_HOST_ENV=""
+if [ -n "$DOCKER_HOST" ]; then
+    case "$DOCKER_HOST" in
+        tcp://*)
+            # Extract host:port from tcp://host:port
+            TCP_HOST_PORT="${DOCKER_HOST#tcp://}"
+            TCP_HOST="${TCP_HOST_PORT%%:*}"
+            TCP_PORT="${TCP_HOST_PORT##*:}"
+
+            # Resolve hostname to IP using getent (Linux) or ping fallback
+            RESOLVED_IP=""
+            if command -v getent >/dev/null 2>&1; then
+                RESOLVED_IP=$(getent hosts "$TCP_HOST" 2>/dev/null | awk '{print $1; exit}')
+            fi
+
+            # Fallback to ping if getent didn't work or isn't available
+            if [ -z "$RESOLVED_IP" ]; then
+                # ping output: "PING hostname (1.2.3.4)" - extract IP from parentheses
+                RESOLVED_IP=$(ping -c 1 "$TCP_HOST" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -1 | tr -d '()')
+            fi
+
+            if [ -n "$RESOLVED_IP" ]; then
+                DOCKER_HOST_ENV="-e DOCKER_HOST=tcp://$RESOLVED_IP:$TCP_PORT"
+            fi
+            ;;
+    esac
+fi
+
 # Cleanup function to stop the container on exit
 cleanup() {
     if [ -n "$CONTAINER_NAME" ]; then
@@ -158,12 +188,14 @@ fi
 docker run --rm \
     --init \
     --name "$CONTAINER_NAME" \
+    --privileged \
     -v "$PROJECT_DIR:/workspace" \
     -v "$KANNICH_CACHE_DIR:/kannich/cache" \
     $DOCKER_SOCKET_MOUNT \
     $DOCKER_CERT_MOUNT \
     $DEV_MODE_MOUNT \
     $ENV_ARGS \
+    $DOCKER_HOST_ENV \
     -w /workspace \
     "$KANNICH_IMAGE" \
     /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar "$@"

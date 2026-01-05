@@ -160,6 +160,30 @@ if defined DOCKER_HOST (
     )
 )
 
+REM If DOCKER_HOST is tcp://, resolve hostname to IP for container use
+REM This avoids DNS resolution issues inside the container
+set DOCKER_HOST_ENV=
+if defined DOCKER_HOST (
+    echo !DOCKER_HOST! | findstr /B /C:"tcp://" >nul
+    if !errorlevel!==0 (
+        REM Extract host:port from tcp://host:port
+        set "TCP_HOST_PORT=!DOCKER_HOST:tcp://=!"
+        REM Split by colon to get host and port
+        for /f "tokens=1,2 delims=:" %%A in ("!TCP_HOST_PORT!") do (
+            set "TCP_HOST=%%A"
+            set "TCP_PORT=%%B"
+        )
+        REM Resolve hostname to IP using ping (works on Windows)
+        REM ping output: "Pinging hostname [1.2.3.4]" - extract IP from brackets
+        for /f "tokens=2 delims=[]" %%I in ('ping -n 1 -4 !TCP_HOST! 2^>nul ^| findstr /i "pinging"') do (
+            set "RESOLVED_IP=%%I"
+        )
+        if defined RESOLVED_IP (
+            set "DOCKER_HOST_ENV=-e DOCKER_HOST=tcp://!RESOLVED_IP!:!TCP_PORT!"
+        )
+    )
+)
+
 REM Mount DOCKER_CERT_PATH if set (for TLS certificate resolution)
 REM Mount certs to Docker-formatted path and override env var so container can find them
 set DOCKER_CERT_MOUNT=
@@ -189,6 +213,7 @@ REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
 docker run --rm ^
     --init ^
+    --privileged ^
     --name %CONTAINER_NAME% ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
@@ -197,6 +222,7 @@ docker run --rm ^
     %DEV_MODE_MOUNT% ^
     %ENV_ARGS% ^
     %DOCKER_CERT_ENV% ^
+    %DOCKER_HOST_ENV% ^
     -w /workspace ^
     %KANNICH_IMAGE% ^
     /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar %*
