@@ -12,29 +12,46 @@ import dev.kannich.trivy.Trivy
 
 pipeline {
     val java = Java("21")
-    val maven = Maven("3.9.6", java)
     val trivy = Trivy("0.68.2")
 
 
-    val release = job("release") {
-        // fail fast, verify required variables
-        val dockerUsername = getEnv("KANNICH_DOCKER_USERNAME")
-            ?: fail("Please specify username for docker login in KANNICH_DOCKER_USERNAME")
-        val dockerPassword = getEnv("KANNICH_DOCKER_PASSWORD")
-            ?: fail("Please specify password/token for docker login in KANNICH_DOCKER_PASSWORD")
-        val version =
-            getEnv("KANNICH_RELEASE_VERSION") ?: fail("Please specify release version in KANNICH_RELEASE_VERSION.")
-        val setLatest = "true" == (getEnv("KANNICH_SET_LATEST") ?: "true")
-        val dryRun = "true" == (getEnv("KANNICH_DRY_RUN") ?: "false")
+    fun requireEnv(name: String): String {
+        return getEnv(name) ?: fail("Please specify $name in environment variables.")
+    }
 
+    fun envToggle(name: String, defaultValue: Boolean = false): Boolean {
+        return "true" == (getEnv(name) ?: "$defaultValue")
+    }
+
+
+    val release = job("release", "Releases Kannich to Docker Hub and Maven Central") {
+        val dockerUsername = requireEnv("KANNICH_DOCKER_USERNAME")
+        val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
+        val gpgKey = requireEnv("KANNICH_GPG_KEY")
+        val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
+        val version = requireEnv("KANNICH_VERSION")
+        val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
+        val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
+
+        val setLatest = envToggle("KANNICH_SET_LATEST", true)
+        val dryRun = envToggle("KANNICH_DRY_RUN")
+
+        val maven = Maven("3.9.6", java) {
+            server("ossrh") {
+                username = sonatypeUsername
+                password = sonatypePassword
+            }
+        }
+
+        Gpg.importKey(gpgKey)
 
         // set version to desired version
         log("Setting version to $version")
         maven.exec("-B", "-q", "versions:set", "-DnewVersion=$version")
 
-        // build jar and docker image
+        // build cli jar and docker image
         log("Building jar and docker image")
-        maven.exec("-B", "-q", "-Pbootstrap", "install")
+        maven.exec("-B", "-q", "-Pbootstrap", "install", "-DskipTests")
 
         // run trivy on docker image to detect vulnerabilities
         log("Checking for vulnerabilities in docker image")
@@ -53,8 +70,6 @@ pipeline {
             includes("trivy-results.json")
         }
 
-
-        // push version to docker hub
         if (!dryRun) {
             log("Publishing docker image to docker hub")
             Docker.login(dockerUsername, dockerPassword)
@@ -65,25 +80,18 @@ pipeline {
                 Docker.exec("tag", "derkork/kannich:$version", "derkork/kannich:latest")
                 Docker.exec("push", "derkork/kannich:latest")
             }
+
+            log("Publishing to Maven Central")
+            withEnv(mapOf("MAVEN_GPG_PASSPHRASE" to gpgPassphrase)) {
+                maven.exec("-B", "-Prelease", "deploy", "-DskipTests")
+            }
         } else {
-            log("Dry run: not pushing to docker hub.")
+            log("Dry run: not pushing.")
         }
-
-
     }
 
 
-    execution("release") {
+    execution("release", "Releases Kannich to Docker Hub and Maven Central") {
         job(release)
-    }
-
-
-    execution("test") {
-        job("test") {
-            secret("World!")
-            log("Getenv: ${getEnv("NOOT")}")
-            Shell.execShell("echo 'Hello World!'")
-            log("Hello World!")
-        }
     }
 }
