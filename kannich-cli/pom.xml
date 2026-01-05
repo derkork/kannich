@@ -55,59 +55,96 @@
     </dependencies>
 
     <build>
-        <plugins>
-            <!-- Create executable fat JAR -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                        <exclude>META-INF/*.EC</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <!--
-                                Transformers for proper fat JAR creation. Kotlin scripting with
-                                MavenDependenciesResolver requires careful merging of service
-                                discovery metadata from multiple JARs.
-                            -->
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>dev.kannich.cli.MainKt</mainClass>
-                                </transformer>
-                                <!-- Merges META-INF/services/* files (Java SPI). Required for
-                                     TransporterFactory and RepositoryConnectorFactory discovery. -->
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                                <!-- Merges META-INF/plexus/components.xml files. Required because
-                                     kotlin-scripting-dependencies-maven uses Wagon for HTTP transport,
-                                     and Wagon discovers implementations via Plexus component descriptors.
-                                     Without this, "Could not obtain transporter factory" errors occur. -->
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ComponentsXmlResourceTransformer"/>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/kotlin_module</resource>
-                                </transformer>
-                                <!-- Merges Sisu DI indexes for Maven Resolver components. -->
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/sisu/javax.inject.Named</resource>
-                                </transformer>
-                            </transformers>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
+        <pluginManagement>
+            <plugins>
+                <!-- Create executable fat JAR -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <filters>
+                                    <filter>
+                                        <artifact>*:*</artifact>
+                                        <excludes>
+                                            <exclude>META-INF/*.SF</exclude>
+                                            <exclude>META-INF/*.DSA</exclude>
+                                            <exclude>META-INF/*.RSA</exclude>
+                                            <exclude>META-INF/*.EC</exclude>
+                                        </excludes>
+                                    </filter>
+                                </filters>
+                                <!--
+                                    Transformers for proper fat JAR creation. Kotlin scripting with
+                                    MavenDependenciesResolver requires careful merging of service
+                                    discovery metadata from multiple JARs.
+                                -->
+                                <transformers>
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                        <mainClass>dev.kannich.cli.MainKt</mainClass>
+                                    </transformer>
+                                    <!-- Merges META-INF/services/* files (Java SPI). Required for
+                                         TransporterFactory and RepositoryConnectorFactory discovery. -->
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                    <!-- Merges META-INF/plexus/components.xml files. Required because
+                                         kotlin-scripting-dependencies-maven uses Wagon for HTTP transport,
+                                         and Wagon discovers implementations via Plexus component descriptors.
+                                         Without this, "Could not obtain transporter factory" errors occur. -->
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ComponentsXmlResourceTransformer"/>
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/kotlin_module</resource>
+                                    </transformer>
+                                    <!-- Merges Sisu DI indexes for Maven Resolver components. -->
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/sisu/javax.inject.Named</resource>
+                                    </transformer>
+                                </transformers>
+                                <createDependencyReducedPom>false</createDependencyReducedPom>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
+
+    <profiles>
+        <profile>
+            <id>bootstrap</id>
+            <!-- Only run the shading in the bootstrap profile -->
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>release</id>
+            <!-- Don't publish the cli jar -->
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <configuration>
+                            <skipPublishing>true</skipPublishing>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

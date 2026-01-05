@@ -1,9 +1,7 @@
-package dev.kannich.gpg
+﻿package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.Shell
 import dev.kannich.stdlib.context.currentJobContext
-import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.fail
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -17,14 +15,13 @@ import org.slf4j.LoggerFactory
  * Usage:
  * ```kotlin
  * pipeline {
- *     val gpg = Gpg()
  *
  *     val sign = job("Sign") {
  *         // Import key from environment variable
- *         gpg.importKey(getenv("GPG_PRIVATE_KEY") ?: "")
+ *         Gpg.importKey(getenv("GPG_PRIVATE_KEY") ?: "")
  *
  *         // Or import from a file
- *         gpg.importKeyFile("/workspace/keys/signing-key.asc")
+ *         Gpg.importKeyFile("/workspace/keys/signing-key.asc")
  *
  *         // Now Maven can use gpg for signing
  *         maven.exec("deploy", "-Dgpg.passphrase=${getenv("GPG_PASSPHRASE")}")
@@ -77,25 +74,16 @@ object Gpg {
      * @throws dev.kannich.stdlib.JobFailedException if import fails or file doesn't exist
      */
     suspend fun importKeyFile(path: String, deleteAfterImport: Boolean = false) {
-        val ctx = currentJobContext()
-
-        // Resolve path relative to workspace if not absolute
-        val keyPath = if (path.startsWith("/")) {
-            path
-        } else {
-            "${ctx.workingDir}/$path"
-        }
-
-        if (!Fs.exists(keyPath)) {
-            fail("GPG key file not found: $keyPath")
+        if (!Fs.exists(path)) {
+            fail("GPG key file not found: $path")
         }
 
         try {
-            doImport(keyPath)
+            doImport(path)
         } finally {
-            if (deleteAfterImport && Fs.exists(keyPath)) {
-                Fs.delete(keyPath)
-                logger.info("Deleted key file after import: $keyPath")
+            if (deleteAfterImport && Fs.exists(path)) {
+                Fs.delete(path)
+                logger.debug("Deleted key file after import: $path")
             }
         }
     }
@@ -115,11 +103,5 @@ object Gpg {
 
         // Log success - gpg outputs to stderr even on success
         logger.info("Successfully imported GPG key")
-
-        // Optionally list the imported key for verification
-        val listResult = Shell.execShell("gpg --list-secret-keys --keyid-format LONG 2>&1")
-        if (listResult.success && listResult.stdout.isNotBlank()) {
-            logger.debug("Available secret keys:\n${listResult.stdout}")
-        }
     }
 }

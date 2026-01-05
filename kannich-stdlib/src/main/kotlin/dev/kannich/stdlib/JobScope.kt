@@ -56,6 +56,17 @@ class JobScope(name: String): Logging by LoggingImpl("Job $name") {
     }
 
     /**
+     * Changes the given environment variables for the duration of the block.
+     *
+     * @param vars The environment variables to set. If a variable is null, it is removed from the environment.
+     * @param block The block to execute with the new environment.
+     * @return The result of the block.
+     */
+    suspend fun <T> withEnv(vars: Map<String, String?>, block: suspend () -> T): T {
+        return currentJobContext().withEnv(vars, block)
+    }
+
+    /**
      * Registers a cleanup action to run when the job completes.
      * Cleanup actions run in reverse order (last registered runs first).
      * Cleanup runs regardless of job success or failure.

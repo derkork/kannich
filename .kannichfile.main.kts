@@ -15,6 +15,7 @@ pipeline {
     val maven = Maven("3.9.6", java)
     val trivy = Trivy("0.68.2")
 
+
     val release = job("release") {
         // fail fast, verify required variables
         val dockerUsername = getEnv("KANNICH_DOCKER_USERNAME")
@@ -26,8 +27,6 @@ pipeline {
         val setLatest = "true" == (getEnv("KANNICH_SET_LATEST") ?: "true")
         val dryRun = "true" == (getEnv("KANNICH_DRY_RUN") ?: "false")
 
-        // check docker login.
-        Docker.login(dockerUsername, dockerPassword)
 
         // set version to desired version
         log("Setting version to $version")
@@ -58,6 +57,7 @@ pipeline {
         // push version to docker hub
         if (!dryRun) {
             log("Publishing docker image to docker hub")
+            Docker.login(dockerUsername, dockerPassword)
             Docker.exec("push", "derkork/kannich:$version")
             // also push to the "latest" tag if desired
             if (setLatest) {

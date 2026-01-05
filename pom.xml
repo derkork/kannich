@@ -11,6 +11,28 @@
 
     <name>Kannich</name>
     <description>CI pipeline executor using Kotlin Script DSL</description>
+    <url>https://kannich.dev</url>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Jan Thomae</name>
+            <email>janthomae@janthomae.de</email>
+            <organization>Ancient Light Studios</organization>
+            <organizationUrl>https://www.ancientlightstudios.com</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://forgejo.osthoehe41.de/derkork/kannich.git</connection>
+        <developerConnection>scm:git:ssh://git@forgejo.osthoehe41.de:2222/derkork/kannich.git</developerConnection>
+        <url>https://forgejo.osthoehe41.de/derkork/kannich</url>
+    </scm>
 
     <modules>
         <module>kannich-stdlib</module>
@@ -18,7 +40,6 @@
         <module>kannich-cli</module>
         <module>kannich-java</module>
         <module>kannich-maven</module>
-        <module>kannich-gpg</module>
         <module>kannich-trivy</module>
         <module>kannich-helm</module>
     </modules>
@@ -245,7 +266,91 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.6.0</version>
                 </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.1</version>
+                    <configuration>
+                        <skip>true</skip>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.3.0</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.3.0</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.jetbrains.dokka</groupId>
+                    <artifactId>dokka-maven-plugin</artifactId>
+                    <version>1.9.10</version>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>javadocJar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>3.2.8</version>
+                    <executions>
+                        <execution>
+                            <id>sign-artifacts</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>sign</goal>
+                            </goals>
+                            <configuration>
+                                <gpgArguments>
+                                    <arg>--pinentry-mode</arg>
+                                    <arg>loopback</arg>
+                                </gpgArguments>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.sonatype.central</groupId>
+                    <artifactId>central-publishing-maven-plugin</artifactId>
+                    <version>0.9.0</version>
+                    <extensions>true</extensions>
+                    <configuration>
+                        <publishingServerId>ossrh</publishingServerId>
+                    </configuration>
+                </plugin>
             </plugins>
+
         </pluginManagement>
 
         <plugins>
@@ -269,7 +374,6 @@
             </properties>
         </profile>
 
-        <!-- Release profile pushes the jar files to maven central -->
         <profile>
             <id>release</id>
             <build>
