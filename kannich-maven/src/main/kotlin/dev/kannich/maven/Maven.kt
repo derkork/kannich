@@ -1,11 +1,11 @@
 package dev.kannich.maven
 
 import dev.kannich.java.Java
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger
@@ -154,7 +154,7 @@ class Maven(
         val settingsArgs = if (servers.isNotEmpty()) {
             val settingsPath = generateSettingsXml()
             // Register cleanup to delete settings.xml when job completes
-            currentJobContext().onCleanup {
+            JobContext.current().onCleanup {
                 Fs.delete(settingsPath)
             }
             listOf("-s", settingsPath)
@@ -175,7 +175,7 @@ class Maven(
             "M2_HOME" to homeDir
         )
 
-        val result = currentJobContext().withEnv(env) {
+        val result = JobContext.current().withEnv(env) {
             Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray())
         }
 
@@ -190,7 +190,7 @@ class Maven(
      * Returns the path to the generated file.
      */
     private suspend fun generateSettingsXml(): String {
-        val ctx = currentJobContext()
+        val ctx = JobContext.current()
         val settingsPath = "${ctx.workingDir}/.kannich/settings.xml"
 
         val xml = buildString {

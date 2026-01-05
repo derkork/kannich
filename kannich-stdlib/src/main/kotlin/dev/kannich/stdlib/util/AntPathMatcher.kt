@@ -1,5 +1,7 @@
 package dev.kannich.stdlib.util
 
+import java.util.concurrent.ConcurrentHashMap
+
 /**
  * Utility for matching file paths against ant-style glob patterns.
  *
@@ -11,6 +13,7 @@ package dev.kannich.stdlib.util
  * No implicit shorthands - patterns ending in `/` do NOT automatically append `**`.
  */
 object AntPathMatcher {
+    private val regexCache = ConcurrentHashMap<String, Regex>()
 
     /**
      * Checks if the given path matches the pattern.
@@ -20,7 +23,7 @@ object AntPathMatcher {
      * @return true if the path matches the pattern
      */
     fun matches(pattern: String, path: String): Boolean {
-        val regex = patternToRegex(pattern)
+        val regex = regexCache.getOrPut(pattern) { patternToRegex(pattern) }
         return regex.matches(path)
     }
 
@@ -33,24 +36,9 @@ object AntPathMatcher {
 
         while (i < pattern.length) {
             when {
-                // Handle **/ at start of pattern - matches zero or more directories
-                i == 0 && pattern.startsWith("**/") -> {
-                    result.append("(.*/)?")
-                    i += 3
-                }
-                // Handle /**/ in middle - matches zero or more directories
-                pattern[i] == '/' && i + 3 <= pattern.length && pattern.substring(i, minOf(i + 4, pattern.length)).startsWith("/**/") -> {
-                    result.append("/(.*/)?")
-                    i += 4
-                }
-                // Handle /** at end - matches everything including subdirectories
-                pattern[i] == '/' && i + 2 < pattern.length && pattern.substring(i).startsWith("/**") && (i + 3 >= pattern.length || pattern[i + 3] == '/') -> {
-                    result.append("/.*")
-                    i += 3
-                }
                 // Handle ** (must check before single *)
                 i + 1 < pattern.length && pattern[i] == '*' && pattern[i + 1] == '*' -> {
-                    result.append(".*")
+                    result.append(".*?")
                     i += 2
                 }
                 // Handle single *

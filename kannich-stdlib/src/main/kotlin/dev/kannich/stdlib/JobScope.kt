@@ -12,7 +12,7 @@ class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) "
     /**
      * Returns the value of an environment variable or null if it is not set.
      */
-    suspend fun getEnv(name: String): String? = currentJobContext().env[name]
+    suspend fun getEnv(name: String): String? = JobContext.current().env[name]
 
     /**
      * Collects artifacts matching the specified patterns.
@@ -61,7 +61,7 @@ class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) "
      * @return The result of the block.
      */
     suspend fun <T> withEnv(vars: Map<String, String?>, block: suspend () -> T): T {
-        return currentJobContext().withEnv(vars, block)
+        return JobContext.current().withEnv(vars, block)
     }
 
     /**
@@ -72,7 +72,7 @@ class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) "
      * @param action The cleanup action to execute
      */
     suspend fun onCleanup(action: suspend () -> Unit) {
-        currentJobContext().onCleanup(action)
+        JobContext.current().onCleanup(action)
     }
 
     /**
@@ -96,7 +96,7 @@ class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) "
      * @throws JobFailedException if the directory does not exist
      */
     suspend fun <T> cd(path: String, block: suspend () -> T): T {
-        return currentJobContext().cd(path, block)
+        return JobContext.current().cd(path, block)
     }
 }
 

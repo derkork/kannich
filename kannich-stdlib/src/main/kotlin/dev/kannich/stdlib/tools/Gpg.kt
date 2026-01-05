@@ -1,6 +1,6 @@
 ﻿package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.currentJobContext
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -47,7 +47,7 @@ object Gpg {
             fail("GPG key cannot be empty")
         }
 
-        val ctx = currentJobContext()
+        val ctx = JobContext.current()
         val tempKeyFile = "${ctx.workingDir}/.kannich/gpg-key-${System.currentTimeMillis()}.asc"
 
         try {

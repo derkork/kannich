@@ -1,7 +1,7 @@
 package dev.kannich.stdlib.tools
 
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.util.ExecResult
-import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.util.ProcessUtil
 
 /**
@@ -22,7 +22,7 @@ object Shell {
         vararg args: String,
         silent: Boolean = false
     ): ExecResult {
-        val ctx = currentJobContext()
+        val ctx = JobContext.current()
         val fullCommand = listOf(command) + args.toList()
         return ProcessUtil.exec(fullCommand, ctx.workingDir, ctx.env, silent)
     }
@@ -39,7 +39,7 @@ object Shell {
         command: String,
         silent: Boolean = false
     ): ExecResult {
-        val ctx = currentJobContext()
+        val ctx = JobContext.current()
         return ProcessUtil.execShell(command, ctx.workingDir, ctx.env, silent)
     }
 }

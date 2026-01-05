@@ -1,6 +1,6 @@
 package dev.kannich.java
 
-import dev.kannich.stdlib.currentJobContext
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor
@@ -75,7 +75,7 @@ class Java(val version: String) {
     suspend fun exec(vararg args: String) {
         ensureInstalled()
         val homeDir = home()
-        val result = currentJobContext().withEnv( mapOf("JAVA_HOME" to homeDir)) {
+        val result = JobContext.current().withEnv(mapOf("JAVA_HOME" to homeDir)) {
             Shell.exec("$homeDir/bin/java", *args)
         }
         if (!result.success) {

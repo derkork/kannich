@@ -8,7 +8,7 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * Context for job execution. Provides access to common resources and utilities within a job block and for tools.
- * Can be accessed via [currentJobContext].
+ * Can be accessed via [current].
  */
 class JobContext(
     val env: Map<String, String> = mapOf(),
@@ -18,7 +18,12 @@ class JobContext(
 
     private val logger = LoggerFactory.getLogger(JobContext::class.java)
 
-    companion object Key : CoroutineContext.Key<JobContext>
+    companion object {
+        suspend fun current(): JobContext = currentCoroutineContext()[Key]
+            ?: error("No JobContext available. Are you inside a job block during execution?")
+
+        object Key : CoroutineContext.Key<JobContext>
+    }
 
     override val key: CoroutineContext.Key<JobContext> get() = Key
 
@@ -102,10 +107,3 @@ class JobContext(
     }
 }
 
-/**
- * Gets the current job context.
- * @throws IllegalStateException if no context is available
- */
-suspend fun currentJobContext(): JobContext =
-    currentCoroutineContext()[JobContext]
-        ?: error("No JobContext available. Are you inside a job block during execution?")

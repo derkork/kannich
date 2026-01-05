@@ -1,7 +1,7 @@
 package dev.kannich.stdlib.tools
 
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.util.ExecResult
-import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.secret
 import org.slf4j.LoggerFactory
@@ -53,7 +53,7 @@ object Docker {
         secret(password)
         logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")
         val registryArg = registry ?: ""
-        val result = currentJobContext().withEnv(mapOf("DOCKER_PASSWORD" to password)) {
+        val result = JobContext.current().withEnv(mapOf("DOCKER_PASSWORD" to password)) {
             Shell.execShell(
                 "echo \"\$DOCKER_PASSWORD\" | docker login -u \"$username\" --password-stdin $registryArg".trim(),
                 silent = true
