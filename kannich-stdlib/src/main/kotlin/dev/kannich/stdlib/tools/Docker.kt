@@ -1,7 +1,7 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.ExecResult
-import dev.kannich.stdlib.context.currentJobContext
+import dev.kannich.stdlib.util.ExecResult
+import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.secret
 import org.slf4j.LoggerFactory

@@ -1,6 +1,5 @@
 package dev.kannich.core.execution
 
-import dev.kannich.core.docker.ContainerManager
 import dev.kannich.stdlib.ArtifactSpec
 import dev.kannich.stdlib.ExecutionReference
 import dev.kannich.stdlib.ExecutionStep
@@ -8,23 +7,25 @@ import dev.kannich.stdlib.Job
 import dev.kannich.stdlib.JobExecutionStep
 import dev.kannich.stdlib.JobFailedException
 import dev.kannich.stdlib.JobScope
+import dev.kannich.stdlib.Kannich
 import dev.kannich.stdlib.ParallelSteps
 import dev.kannich.stdlib.Pipeline
 import dev.kannich.stdlib.SequentialSteps
-import dev.kannich.stdlib.context.JobContext
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.timedSuspend
 import dev.kannich.stdlib.tools.Fs
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.createParentDirectories
 
 /**
  * Executes Kannich pipelines inside Docker containers.
  * Handles job orchestration, overlay isolation, and artifact collection.
  */
 class ExecutionEngine(
-    private val containerManager: ContainerManager,
-    private val artifactsDir: File,
+    private val artifactsDir: Path,
     private val extraEnv: Map<String, String> = emptyMap()
 ) {
     private val logger = LoggerFactory.getLogger(ExecutionEngine::class.java)
@@ -37,11 +38,8 @@ class ExecutionEngine(
         val execution = pipeline.executions[executionName]
             ?: throw IllegalArgumentException("Execution not found: $executionName")
 
-        containerManager.initialize()
 
-        return containerManager.use { _ ->
-            executeSteps(execution.steps, pipeline)
-        }
+        return executeSteps(execution.steps, pipeline)
     }
 
     private fun executeSteps(
@@ -85,9 +83,9 @@ class ExecutionEngine(
             )
         } finally {
             // Cleanup intermediate layers
-            layersToCleanup.forEach { containerManager.removeJobLayer(it) }
+            layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
             // Cleanup final layer
-            currentLayerId?.let { containerManager.removeJobLayer(it) }
+            currentLayerId?.let { LayerManager.removeJobLayer(it) }
         }
     }
 
@@ -122,8 +120,8 @@ class ExecutionEngine(
             }
             return ExecutionResult(success = true, jobResults = jobResults.toMap())
         } finally {
-            layersToCleanup.forEach { containerManager.removeJobLayer(it) }
-            currentLayerId?.let { containerManager.removeJobLayer(it) }
+            layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
+            currentLayerId?.let { LayerManager.removeJobLayer(it) }
         }
     }
 
@@ -160,16 +158,14 @@ class ExecutionEngine(
         logger.info("Running job: ${job.name}")
 
         // Create job layer from parent (or workspace if no parent)
-        val layerId = containerManager.createJobLayer(parentLayerId)
-        val workDir = containerManager.getLayerWorkDir(layerId)
+        val layerId = LayerManager.createJobLayer(parentLayerId)
+        val workDir = LayerManager.getLayerWorkDir(layerId)
 
         // Create job context
-        val executor = ContainerCommandExecutor(containerManager)
         val jobCtx = JobContext(
-            cacheDir = containerManager.containerCacheDir,
-            projectDir = containerManager.containerProjectDir,
+            cacheDir = Kannich.CACHE_DIR,
+            projectDir = Kannich.WORKSPACE_DIR,
             env = System.getenv() + extraEnv,
-            executor = executor,
             workingDir = workDir
         )
 
@@ -224,7 +220,7 @@ class ExecutionEngine(
         return if (success) {
             Pair(execResult, layerId)
         } else {
-            containerManager.removeJobLayer(layerId)
+            LayerManager.removeJobLayer(layerId)
             Pair(execResult, null)
         }
     }
@@ -243,8 +239,8 @@ class ExecutionEngine(
 
         // Security check: ensure all destinations are within artifacts dir
         val safePaths = matchingPaths.filter { relativePath ->
-            val destFile = File(artifactsDir, relativePath)
-            val isSafe = destFile.canonicalPath.startsWith(artifactsDir.canonicalPath)
+            val destFile = artifactsDir.resolve(relativePath)
+            val isSafe = destFile.normalize().startsWith(artifactsDir.normalize())
             if (!isSafe) {
                 logger.warn("Skipping artifact outside workspace: $relativePath")
             }
@@ -255,13 +251,14 @@ class ExecutionEngine(
             return
         }
 
-        // Log matched artifacts
+        // Log and copy matched artifacts
         for (path in safePaths) {
             logger.info("Matched artifact: $path")
+            val target = artifactsDir.resolve(path)
+            target.createParentDirectories()
+            Files.copy(Path.of(workDir, path), target)
         }
 
-        // Copy all artifacts
-        containerManager.copyArtifacts(workDir, safePaths, artifactsDir)
     }
 }
 

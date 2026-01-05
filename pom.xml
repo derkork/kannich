@@ -53,7 +53,6 @@
         <maven.compiler.target>21</maven.compiler.target>
 
         <!-- Dependency versions (only for artifacts used in multiple places) -->
-        <docker-java.version>3.7.0</docker-java.version>
         <maven-resolver.version>1.9.2</maven-resolver.version>
     </properties>
 
@@ -115,18 +114,6 @@
                 <groupId>org.jetbrains.kotlinx</groupId>
                 <artifactId>kotlinx-coroutines-core</artifactId>
                 <version>1.9.0</version>
-            </dependency>
-
-            <!-- Docker Java Client -->
-            <dependency>
-                <groupId>com.github.docker-java</groupId>
-                <artifactId>docker-java-core</artifactId>
-                <version>${docker-java.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.github.docker-java</groupId>
-                <artifactId>docker-java-transport-httpclient5</artifactId>
-                <version>${docker-java.version}</version>
             </dependency>
 
             <!-- Archive handling for Docker copy operations -->

@@ -1,6 +1,6 @@
 package dev.kannich.java
 
-import dev.kannich.stdlib.context.currentJobContext
+import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor

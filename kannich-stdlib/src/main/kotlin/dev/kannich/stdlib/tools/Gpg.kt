@@ -1,6 +1,6 @@
 ﻿package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.currentJobContext
+import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

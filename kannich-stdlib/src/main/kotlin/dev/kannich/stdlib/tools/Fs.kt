@@ -1,10 +1,12 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.currentJobContext
+import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.AntPathMatcher
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 
 /**
@@ -156,7 +158,16 @@ object Fs {
         } else {
             logger.info("Writing to $absolutePath")
         }
-        ctx.executor.writeFile(absolutePath, content, append)
+
+        try {
+            val file = File(absolutePath)
+            FileOutputStream(file, append).use {
+                content.copyTo(it)
+            }
+        }
+        catch(e:Exception) {
+            fail("Failed to write to $absolutePath: ${e.message}")
+        }
     }
 
     /**

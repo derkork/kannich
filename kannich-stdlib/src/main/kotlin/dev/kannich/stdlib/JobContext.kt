@@ -1,9 +1,9 @@
-package dev.kannich.stdlib.context
+package dev.kannich.stdlib
 
-import dev.kannich.stdlib.fail
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -14,7 +14,6 @@ class JobContext(
     val cacheDir: String,
     val projectDir: String,
     val env: Map<String, String> = mapOf(),
-    val executor: CommandExecutor,
     val workingDir: String,
     private val cleanupActions: MutableList<suspend () -> Unit> = mutableListOf()
 ) : CoroutineContext.Element {
@@ -44,19 +43,12 @@ class JobContext(
      * @param path The relative path to change to
      * @param block The block to execute in the new directory
      * @return The result of the block
-     * @throws dev.kannich.stdlib.JobFailedException if the directory does not exist
+     * @throws JobFailedException if the directory does not exist
      */
     suspend fun <T> cd(path: String, block: suspend () -> T): T {
         val newWorkingDir = "$workingDir/$path"
 
-        // Check if directory exists before changing to it
-        val checkResult = executor.exec(
-            command = listOf("test", "-d", newWorkingDir),
-            workingDir = workingDir,
-            env = env,
-            silent = true
-        )
-        if (!checkResult.success) {
+        if (!Path.of(newWorkingDir).toFile().exists()) {
             fail("Directory '$path' does not exist (full path: $newWorkingDir)")
         }
 
@@ -64,7 +56,6 @@ class JobContext(
             cacheDir = cacheDir,
             projectDir = projectDir,
             env = env,
-            executor = executor,
             workingDir = newWorkingDir,
             cleanupActions = cleanupActions
         )
@@ -94,7 +85,6 @@ class JobContext(
             cacheDir = cacheDir,
             projectDir = projectDir,
             env = newEnv,
-            executor = executor,
             workingDir = workingDir,
             cleanupActions = cleanupActions
         )

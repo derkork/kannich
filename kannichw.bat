@@ -6,8 +6,7 @@ REM Commit this file with your project to enable portable CI builds.
 setlocal enabledelayedexpansion
 
 REM Configuration
-if "%KANNICH_VERSION%"=="" set KANNICH_VERSION=0.1.0
-set KANNICH_IMAGE=derkork/kannich:%KANNICH_VERSION%
+if "%KANNICH_IMAGE%"=="" set KANNICH_IMAGE=derkork/kannich:latest
 if "%KANNICH_CACHE_DIR%"=="" set KANNICH_CACHE_DIR=%USERPROFILE%\.kannich\cache
 
 REM Default prefixes for environment variables to pass to Docker

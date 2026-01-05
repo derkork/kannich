@@ -1,4 +1,4 @@
-package dev.kannich.stdlib.context
+package dev.kannich.stdlib.util
 
 /**
  * Result of executing a command.

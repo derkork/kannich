@@ -1,6 +1,6 @@
 ﻿package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.context.ExecResult
+import dev.kannich.stdlib.util.ExecResult
 import dev.kannich.stdlib.fail
 import org.slf4j.LoggerFactory
 

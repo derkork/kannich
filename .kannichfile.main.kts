@@ -94,4 +94,10 @@ pipeline {
     execution("release", "Releases Kannich to Docker Hub and Maven Central") {
         job(release)
     }
+
+    execution("test") {
+        job("test") {
+            log("Hello world!")
+        }
+    }
 }

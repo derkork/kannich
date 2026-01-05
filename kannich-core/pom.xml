@@ -69,16 +69,6 @@
             <artifactId>kannich-stdlib</artifactId>
         </dependency>
 
-        <!-- Docker -->
-        <dependency>
-            <groupId>com.github.docker-java</groupId>
-            <artifactId>docker-java-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.github.docker-java</groupId>
-            <artifactId>docker-java-transport-httpclient5</artifactId>
-        </dependency>
-
         <!-- Archive handling for Docker copy operations -->
         <dependency>
             <groupId>org.apache.commons</groupId>

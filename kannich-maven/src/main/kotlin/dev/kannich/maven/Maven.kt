@@ -5,7 +5,7 @@ import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.context.currentJobContext
+import dev.kannich.stdlib.currentJobContext
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Fs
 import org.slf4j.Logger

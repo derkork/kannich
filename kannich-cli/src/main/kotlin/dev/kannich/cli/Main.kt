@@ -12,15 +12,15 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
-import dev.kannich.core.Kannich
-import dev.kannich.core.docker.ContainerManager
-import dev.kannich.core.docker.KannichDockerClient
+import dev.kannich.core.Version
+import dev.kannich.core.execution.LayerManager
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
 import dev.kannich.stdlib.*
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.system.exitProcess
 
 class KannichCommand : CliktCommand(name = "kannich") {
@@ -42,7 +42,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
 
     override fun run() {
         configureLogging()
-        logger.info("Kannich ${Kannich.VERSION}")
+        logger.info("Kannich ${Version.VERSION}")
 
         if (execution == null && !list) {
             logger.info("Usage: kannich [OPTIONS] <execution>")
@@ -58,14 +58,6 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
 
-        // Verify Docker is available
-        val dockerClient = KannichDockerClient()
-        if (!dockerClient.ping()) {
-            logger.error("Docker daemon not available. Is Docker running?")
-            exitProcess(1)
-        }
-        logger.info("Docker: ${dockerClient.version()}")
-
         // Setup Maven repository symlink (normal mode: cached, dev mode: host .m2)
         setupMavenRepository()
 
@@ -74,7 +66,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         val extraEnv = envVars.mapNotNull { envVar ->
             val idx = envVar.indexOf('=')
             if (idx > 0) {
-                val key = envVar.substring(0, idx)
+                val key = envVar.take(idx)
                 val value = envVar.substring(idx + 1)
                 key to value
             } else {
@@ -121,8 +113,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // Run the execution
         logger.info("Running execution: $execution")
 
-        val containerManager = ContainerManager(dockerClient)
-        val executionEngine = ExecutionEngine(containerManager, File(artifactsDir), extraEnv)
+        val executionEngine = ExecutionEngine(Path.of(artifactsDir), extraEnv)
 
         try {
             val executionResult = executionEngine.runExecution(pipeline, execution!!)

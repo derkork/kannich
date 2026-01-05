@@ -1,7 +1,5 @@
 package dev.kannich.stdlib
 
-import dev.kannich.stdlib.context.currentJobContext
-
 /**
  * Scope available inside job blocks.
  * Provides user-facing DSL for artifacts, logging, error handling, and convenience
