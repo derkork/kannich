@@ -125,6 +125,12 @@ else
     DOCKER_SOCKET_MOUNT="-v /var/run/docker.sock:/var/run/docker.sock"
 fi
 
+# Mount DOCKER_CERT_PATH if set (for TLS certificate resolution)
+DOCKER_CERT_MOUNT=""
+if [ -n "$DOCKER_CERT_PATH" ]; then
+    DOCKER_CERT_MOUNT="-v $DOCKER_CERT_PATH:$DOCKER_CERT_PATH"
+fi
+
 # Cleanup function to stop the container on exit
 cleanup() {
     if [ -n "$CONTAINER_NAME" ]; then
@@ -150,12 +156,13 @@ fi
 # --init: Use tini for proper signal handling and zombie reaping
 # --name: Named container for cleanup on Ctrl+C
 # shellcheck disable=SC2086
-docker run --rm -it \
+docker run --rm \
     --init \
     --name "$CONTAINER_NAME" \
     -v "$PROJECT_DIR:/workspace" \
     -v "$KANNICH_CACHE_DIR:/kannich/cache" \
     $DOCKER_SOCKET_MOUNT \
+    $DOCKER_CERT_MOUNT \
     $DEV_MODE_MOUNT \
     $ENV_ARGS \
     -w /workspace \

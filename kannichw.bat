@@ -161,6 +161,19 @@ if defined DOCKER_HOST (
     )
 )
 
+REM Mount DOCKER_CERT_PATH if set (for TLS certificate resolution)
+REM Mount certs to Docker-formatted path and override env var so container can find them
+set DOCKER_CERT_MOUNT=
+set DOCKER_CERT_ENV=
+if defined DOCKER_CERT_PATH (
+    set "CERT_DIR_DOCKER=!DOCKER_CERT_PATH:\=/!"
+    set "CERT_DRIVE_LETTER=!CERT_DIR_DOCKER:~0,1!"
+    set "CERT_PATH_REMAINDER=!CERT_DIR_DOCKER:~2!"
+    set "CERT_DOCKER_PATH=/!CERT_DRIVE_LETTER!!CERT_PATH_REMAINDER!"
+    set "DOCKER_CERT_MOUNT=-v "!CERT_DOCKER_PATH!:!CERT_DOCKER_PATH!""
+    set "DOCKER_CERT_ENV=-e DOCKER_CERT_PATH=!CERT_DOCKER_PATH!"
+)
+
 REM Dev mode: mount host .m2/repository
 set DEV_MODE_MOUNT=
 if %DEV_MODE%==1 (
@@ -175,14 +188,16 @@ if %DEV_MODE%==1 (
 REM Run Kannich inside Docker
 REM --init: Use tini for proper signal handling and zombie reaping
 REM --name: Named container for potential cleanup
-docker run --rm -it ^
+docker run --rm ^
     --init ^
     --name %CONTAINER_NAME% ^
     -v "%PROJECT_DOCKER_PATH%:/workspace" ^
     -v "%CACHE_DOCKER_PATH%:/kannich/cache" ^
     %DOCKER_SOCKET_MOUNT% ^
+    %DOCKER_CERT_MOUNT% ^
     %DEV_MODE_MOUNT% ^
     %ENV_ARGS% ^
+    %DOCKER_CERT_ENV% ^
     -w /workspace ^
     %KANNICH_IMAGE% ^
     /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar %*
