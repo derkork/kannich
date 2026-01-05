@@ -1,13 +1,16 @@
 package dev.kannich.stdlib.tools
 
-import dev.kannich.stdlib.currentJobContext
+import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.AntPathMatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
-import java.io.File
-import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
+import java.nio.file.*
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * Built-in tool for filesystem operations.
@@ -20,18 +23,41 @@ object Fs {
     private val logger = LoggerFactory.getLogger(Fs::class.java)
 
     /**
+     * Resolves a path against the current working directory.
+     * - if the path is null or empty, the function returns the working directory from JobContext.current().
+     * - If the path is absolute, returns the path as is
+     * - otherwise treats the path as subpath of the working directory and returns the full path.
+     *
+     * @param path The path to resolve. If null or empty, returns the working directory.
+     * @return The resolved absolute path.
+     */
+    suspend fun resolve(path: String? = null): String {
+        logger.debug("Resolving path: {}", path ?: "working directory")
+        val ctx = JobContext.current()
+        return Path.of(ctx.workingDir).resolve(path ?: "").toUnixString()
+    }
+
+    /**
+     * Same as [resolve] but returns a [Path] object.
+     */
+    private suspend fun resolvePath(path: String): Path {
+        return Path.of(resolve(path))
+    }
+
+    /**
      * Creates a temporary directory and returns its path.
      *
      * @param prefix Optional prefix for the temp directory name
-     * @return The path to the created temporary directory
+     * @return The absolute path to the created temporary directory.
      * @throws dev.kannich.stdlib.JobFailedException if creation fails
      */
     suspend fun mktemp(prefix: String = "kannich"): String {
-        val result = Shell.execShell("mktemp -d -t '$prefix.XXXXXX'")
-        if (!result.success) {
-            fail("Failed to create temp directory: ${result.stderr}")
+        logger.debug("Creating temporary directory with prefix: {}", prefix)
+        try {
+            return withContext(Dispatchers.IO) { Files.createTempDirectory(prefix) }.toAbsolutePath().toUnixString()
+        } catch (e: Exception) {
+            fail("Failed to create temporary directory with prefix $prefix: ${e.message}")
         }
-        return result.stdout.trim()
     }
 
     /**
@@ -41,89 +67,143 @@ object Fs {
      * @throws dev.kannich.stdlib.JobFailedException if creation fails
      */
     suspend fun mkdir(path: String) {
-        val result = Shell.execShell("mkdir -p '$path'")
-        if (!result.success) {
-            fail("Failed to create directory $path: ${result.stderr}")
+        logger.debug("Creating directory: {}", path)
+        try {
+            withContext(Dispatchers.IO) { Files.createDirectories(resolvePath(path)) }
+        } catch (e: Exception) {
+            fail("Failed to create directory $path: ${e.message}")
         }
     }
 
     /**
-     * Copies files or directories to a destination.
+     * Copies the source file or directory to the destination. Automatically creates missing directories of the destination.
      *
-     * @param src The source path (supports glob patterns like *.txt, /path/files-*)
-     * @param dest The destination path (no glob support, receives the files)
-     * @param recursive Whether to copy directories recursively (default: true)
+     * @param src The source path.
+     * @param dest The destination path.
      * @throws dev.kannich.stdlib.JobFailedException if copy fails
      */
-    suspend fun copy(src: String, dest: String, recursive: Boolean = true) {
-        val flags = if (recursive) "-r" else ""
-        val result = Shell.execShell("cp $flags ${escapeForGlob(src)} '$dest'")
-        if (!result.success) {
-            fail("Failed to copy $src to $dest: ${result.stderr}")
+    suspend fun copy(src: String, dest: String) {
+        logger.debug("Copying {} to {}", src, dest)
+        val source = resolvePath(src)
+        val target = resolvePath(dest)
+
+        try {
+            if (Files.isDirectory(source)) {
+                withContext(Dispatchers.IO) {
+                    Files.walkFileTree(source, object : SimpleFileVisitor<Path>() {
+                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            val targetDir = target.resolve(source.relativize(dir))
+                            Files.createDirectories(targetDir)
+                            return FileVisitResult.CONTINUE
+                        }
+
+                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            val targetFile = target.resolve(source.relativize(file))
+                            Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
+                            return FileVisitResult.CONTINUE
+                        }
+                    })
+                }
+            } else {
+                target.parent?.let { Files.createDirectories(it) }
+                withContext(Dispatchers.IO) {
+                    Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        } catch (e: Exception) {
+            fail("Failed to copy $src to $target: ${e.message}")
         }
     }
 
     /**
-     * Moves files or directories to a destination.
+     * Moves file or directory to a destination. Automatically creates missing directories of the destination.
      *
-     * @param src The source path (supports glob patterns like *.txt, /path/files-*)
-     * @param dest The destination path (no glob support, receives the files)
+     * @param src The source path.
+     * @param dest The destination path.
      * @throws dev.kannich.stdlib.JobFailedException if move fails
      */
     suspend fun move(src: String, dest: String) {
-        val result = Shell.execShell("mv ${escapeForGlob(src)} '$dest'")
-        if (!result.success) {
-            fail("Failed to move $src to $dest: ${result.stderr}")
+        logger.debug("Moving {} to {}", src, dest)
+        val source = resolvePath(src)
+        val target = resolvePath(dest)
+
+        try {
+            target.parent?.let { Files.createDirectories(it) }
+            withContext(Dispatchers.IO) {
+                Files.move(source, target, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (e: Exception) {
+            fail("Failed to move $src to $target: ${e.message}")
         }
     }
 
     /**
-     * Deletes files or directories recursively.
+     * Deletes file or directory (recursively if it's a directory). If the path doesn't exist, does nothing.
      *
-     * @param path The path to delete (supports glob patterns like *.txt, /path/files-*)
+     * @param path The path to delete.
      * @throws dev.kannich.stdlib.JobFailedException if deletion fails
      */
     suspend fun delete(path: String) {
-        val result = Shell.execShell("rm -rf ${escapeForGlob(path)}")
-        if (!result.success) {
-            fail("Failed to delete $path: ${result.stderr}")
+        logger.debug("Deleting path: {}", path)
+        val target = resolvePath(path)
+        if (!Files.exists(target)) return
+
+        try {
+            withContext(Dispatchers.IO) {
+                Files.walkFileTree(target, object : SimpleFileVisitor<Path>() {
+                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                        Files.delete(file)
+                        return FileVisitResult.CONTINUE
+                    }
+
+                    override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                        if (exc != null) throw exc
+                        Files.delete(dir)
+                        return FileVisitResult.CONTINUE
+                    }
+                })
+            }
+        } catch (e: Exception) {
+            fail("Failed to delete $path: ${e.message}")
         }
     }
 
     /**
      * Checks if a path exists.
      *
-     * @param path The exact path to check (no glob support)
+     * @param path The path to check.
      * @return true if the path exists
      */
     suspend fun exists(path: String): Boolean {
-        return Shell.execShell("test -e '$path'", silent = true).success
+        logger.debug("Checking if path exists: {}", path)
+        return Files.exists(resolvePath(path))
     }
 
     /**
      * Checks if a path is a directory.
      *
-     * @param path The exact path to check (no glob support)
+     * @param path The path to check.
      * @return true if the path is a directory
      */
     suspend fun isDirectory(path: String): Boolean {
-        return Shell.execShell("test -d '$path'", silent = true).success
+        logger.debug("Checking if directory: {}", path)
+        return Files.isDirectory(resolvePath(path))
     }
 
     /**
      * Checks if a path is a file.
      *
-     * @param path The exact path to check (no glob support)
+     * @param path The path to check.
      * @return true if the path is a file
      */
     suspend fun isFile(path: String): Boolean {
-        return Shell.execShell("test -f '$path'", silent = true).success
+        logger.debug("Checking if file: {}", path)
+        return Files.isRegularFile(resolvePath(path))
     }
 
     /**
      * Writes text content to a file.
-     * Creates parent directories if needed. Overwrites an existing file.
-     * Uses Docker's copy API for reliable handling of large content.
+     * Creates parent directories if needed. Overwrites an existing file (unless append is true).
      *
      * @param path The file path to write to
      * @param content The text content to write
@@ -131,42 +211,37 @@ object Fs {
      * @throws dev.kannich.stdlib.JobFailedException if write fails
      */
     suspend fun write(path: String, content: String, append: Boolean = false) {
+        logger.debug("Writing string content to {}{}", path, if (append) " (append)" else "")
         write(path, ByteArrayInputStream(content.toByteArray()), append)
     }
 
     /**
      * Writes binary content from an input stream to a file.
-     * Creates parent directories if needed. Overwrites an existing file.
-     * Uses Docker's copy API for reliable streaming of large files.
+     * Creates parent directories if needed. Overwrites an existing file (unless append is true).
      *
-     * @param path The file path to write to (relative to working directory, or absolute)
+     * @param path The file path to write to.
      * @param content The input stream to read content from
      * @param append If true, appends content to the file instead of overwriting
      * @throws dev.kannich.stdlib.JobFailedException if write fails
      */
     suspend fun write(path: String, content: InputStream, append: Boolean = false) {
-        // Ensure parent directory exists
-        val parent = path.substringBeforeLast('/', "")
-        if (parent.isNotEmpty()) {
-            mkdir(parent)
-        }
-        val ctx = currentJobContext()
-        // Make path absolute if it's relative
-        val absolutePath = if (path.startsWith("/")) path else "${ctx.workingDir}/$path"
-        if (append) {
-            logger.info("Appending to $absolutePath")
-        } else {
-            logger.info("Writing to $absolutePath")
-        }
-
+        logger.debug("Writing input stream to {}{}", path, if (append) " (append)" else "")
+        val target = resolvePath(path)
         try {
-            val file = File(absolutePath)
-            FileOutputStream(file, append).use {
-                content.copyTo(it)
+            target.parent?.let { Files.createDirectories(it) }
+            if (append) {
+                withContext(Dispatchers.IO) {
+                    Files.newOutputStream(target, StandardOpenOption.CREATE, StandardOpenOption.APPEND).use { output ->
+                        content.copyTo(output)
+                    }
+                }
+            } else {
+                withContext(Dispatchers.IO) {
+                    Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING)
+                }
             }
-        }
-        catch(e:Exception) {
-            fail("Failed to write to $absolutePath: ${e.message}")
+        } catch (e: Exception) {
+            fail("Failed to write to $path: ${e.message}")
         }
     }
 
@@ -190,55 +265,90 @@ object Fs {
         excludes: List<String> = emptyList(),
         baseDir: String? = null
     ): List<String> {
-        val workDir = baseDir ?: "."
-        val matchingPaths = mutableListOf<String>()
+        logger.debug(
+            "Finding files with glob: includes={}, excludes={}, baseDir={}",
+            includes,
+            excludes,
+            baseDir ?: "cwd"
+        )
+        val rootPath = resolvePath(baseDir ?: "")
+
+        val matchingPaths = mutableSetOf<String>()
 
         // Separate literal paths from patterns with wildcards
         val (literalPaths, patterns) = includes.partition { AntPathMatcher.isLiteralPath(it) }
 
-        // For literal paths, just check if they exist (no find needed)
+        // For literal paths, just check if they exist (no traversal needed)
         for (path in literalPaths) {
-            val fullPath = if (workDir == ".") path else "$workDir/$path"
-            if (Shell.execShell("test -e '$fullPath'", silent = true).success) {
+            val file = rootPath.resolve(path)
+            if (Files.exists(file)) {
                 val matchesExclude = excludes.isNotEmpty() &&
-                                     AntPathMatcher.matchesAny(excludes, path)
+                        AntPathMatcher.matchesAny(excludes, path)
                 if (!matchesExclude) {
                     matchingPaths.add(path)
                 }
             }
         }
 
-        // For patterns with wildcards, use find with base path optimization
+        // For patterns with wildcards, use recursive traversal with optimizations
         if (patterns.isNotEmpty()) {
             val basePaths = AntPathMatcher.getBasePaths(patterns)
 
-            val findCommand = if (basePaths.isEmpty() || basePaths.contains("")) {
-                "find '$workDir' \\( -type f -o -type d \\) 2>/dev/null || true"
+            // Limit depth if no ** pattern is present to avoid unnecessary traversal
+            val maxPatternDepth = patterns.maxOfOrNull {
+                if (it.contains("**")) Int.MAX_VALUE else it.split("/").count { part -> part.isNotEmpty() }
+            } ?: Int.MAX_VALUE
+
+            val searchPaths = if (basePaths.isEmpty() || basePaths.contains("")) {
+                listOf(rootPath)
             } else {
-                val paths = basePaths.joinToString(" ") {
-                    if (workDir == ".") "'$it'" else "'$workDir/$it'"
-                }
-                "find $paths \\( -type f -o -type d \\) 2>/dev/null || true"
+                basePaths.map { rootPath.resolve(it) }
             }
 
-            val findResult = Shell.execShell(findCommand, silent = true)
-            val prefix = if (workDir == ".") "./" else "$workDir/"
+            for (searchPath in searchPaths) {
+                if (!Files.exists(searchPath)) continue
 
-            val allPaths = findResult.stdout.lines()
-                .filter { it.isNotBlank() && it != workDir && it != "." }
-                .map { it.removePrefix(prefix) }
+                // Calculate depth using NIO path components to handle OS-specific separators (e.g. for local development)
+                val relativizedBase = rootPath.relativize(searchPath)
+                val baseDepth = if (relativizedBase.toString().isEmpty()) 0 else relativizedBase.nameCount
 
-            for (relativePath in allPaths) {
-                val matchesInclude = AntPathMatcher.matchesAny(patterns, relativePath)
-                val matchesExclude = excludes.isNotEmpty() &&
-                                     AntPathMatcher.matchesAny(excludes, relativePath)
-                if (matchesInclude && !matchesExclude) {
-                    matchingPaths.add(relativePath)
+                val walkMaxDepth = if (maxPatternDepth == Int.MAX_VALUE) {
+                    Int.MAX_VALUE
+                } else {
+                    maxOf(0, maxPatternDepth - baseDepth)
+                }
+
+                try {
+                    withContext(Dispatchers.IO) {
+                        Files.walk(searchPath, walkMaxDepth).use { stream ->
+                            stream.forEach { file ->
+                                @Suppress("BlockingMethodInNonBlockingContext")
+                                if (Files.isSameFile(file, rootPath)) return@forEach
+
+                                try {
+                                    val relativePath = rootPath.relativize(file).toUnixString()
+                                    if (relativePath.isEmpty()) return@forEach
+
+                                    val matchesInclude = AntPathMatcher.matchesAny(patterns, relativePath)
+                                    val matchesExclude = excludes.isNotEmpty() &&
+                                            AntPathMatcher.matchesAny(excludes, relativePath)
+
+                                    if (matchesInclude && !matchesExclude) {
+                                        matchingPaths.add(relativePath)
+                                    }
+                                } catch (_: Exception) {
+                                    // Skip files that can't be made relative
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Skip search directory if walking fails
                 }
             }
         }
 
-        return matchingPaths
+        return matchingPaths.toList().sorted()
     }
 
     /**
@@ -249,40 +359,14 @@ object Fs {
      * @return List of relative paths matching the pattern
      */
     suspend fun glob(pattern: String, baseDir: String? = null): List<String> {
+        logger.debug("Finding files with glob: pattern={}, baseDir={}", pattern, baseDir ?: "cwd")
         return glob(listOf(pattern), emptyList(), baseDir)
     }
 
-    /**
-     * Escapes shell metacharacters while preserving glob patterns (*, ?, [...]).
-     * This allows paths with spaces to work while still supporting glob expansion.
-     */
-    private fun escapeForGlob(path: String): String {
-        val sb = StringBuilder()
-        var i = 0
-        while (i < path.length) {
-            when (val c = path[i]) {
-                // Preserve glob characters
-                '*', '?' -> sb.append(c)
-                '[' -> {
-                    // Preserve bracket expressions [...]
-                    val closeBracket = path.indexOf(']', i + 1)
-                    if (closeBracket != -1) {
-                        sb.append(path.substring(i, closeBracket + 1))
-                        i = closeBracket
-                    } else {
-                        sb.append("\\[")
-                    }
-                }
-                // Escape shell metacharacters
-                ' ', '\t', '\n', '(', ')', '<', '>', '&', ';', '|',
-                '$', '`', '\\', '"', '\'', '!', '{', '}', '#' -> {
-                    sb.append('\\')
-                    sb.append(c)
-                }
-                else -> sb.append(c)
-            }
-            i++
-        }
-        return sb.toString()
-    }
 }
+
+/**
+ * Normalizes the path separators to forward slashes.
+ */
+fun Path.toUnixString() = this.toString().replace('\\', '/')
+

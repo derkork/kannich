@@ -35,7 +35,7 @@ class AntPathMatcherTest {
 
     @Test
     fun `double star in path matches directories`() {
-        val pattern = "target/**/classes"
+        val pattern = "target/**classes"
         assertTrue(AntPathMatcher.matches(pattern, "target/classes"))
         assertTrue(AntPathMatcher.matches(pattern, "target/foo/classes"))
         assertTrue(AntPathMatcher.matches(pattern, "target/foo/bar/classes"))
@@ -44,7 +44,7 @@ class AntPathMatcherTest {
 
     @Test
     fun `typical maven artifact pattern`() {
-        val pattern = "**/target/*.jar"
+        val pattern = "**target/*.jar"
         assertTrue(AntPathMatcher.matches(pattern, "target/foo.jar"))
         assertTrue(AntPathMatcher.matches(pattern, "module/target/foo.jar"))
         assertTrue(AntPathMatcher.matches(pattern, "a/b/target/app.jar"))
@@ -54,7 +54,7 @@ class AntPathMatcherTest {
 
     @Test
     fun `surefire reports pattern`() {
-        val pattern = "**/target/surefire-reports/**"
+        val pattern = "**target/surefire-reports/**"
         assertTrue(AntPathMatcher.matches(pattern, "target/surefire-reports/TEST-foo.xml"))
         assertTrue(AntPathMatcher.matches(pattern, "module/target/surefire-reports/TEST-foo.xml"))
         assertTrue(AntPathMatcher.matches(pattern, "target/surefire-reports/foo/bar.txt"))
@@ -63,7 +63,7 @@ class AntPathMatcherTest {
 
     @Test
     fun `exclude sources jar pattern`() {
-        val pattern = "**/target/*-sources.jar"
+        val pattern = "**target/*-sources.jar"
         assertTrue(AntPathMatcher.matches(pattern, "target/foo-sources.jar"))
         assertTrue(AntPathMatcher.matches(pattern, "module/target/bar-sources.jar"))
         assertFalse(AntPathMatcher.matches(pattern, "target/foo.jar"))
@@ -96,7 +96,7 @@ class AntPathMatcherTest {
 
     @Test
     fun `complex patterns with multiple wildcards`() {
-        val pattern = "src/**/test/*Test.java"
+        val pattern = "src/**test/*Test.java"
         assertTrue(AntPathMatcher.matches(pattern, "src/test/FooTest.java"))
         assertTrue(AntPathMatcher.matches(pattern, "src/main/test/BarTest.java"))
         assertTrue(AntPathMatcher.matches(pattern, "src/a/b/c/test/BazTest.java"))
