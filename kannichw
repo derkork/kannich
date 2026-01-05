@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Kannich Wrapper Script
 # Runs Kannich inside Docker - no local JVM required.
 # Commit this file with your project to enable portable CI builds.
@@ -15,12 +15,11 @@ DEFAULT_ENV_PREFIXES="CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_ KANNICH_"
 
 # Colors for output
 RED='\033[0;31m'
-GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Determine project directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
 
 # Detect --dev-mode / -d flag (passed through to CLI, but we need to mount volume)
@@ -35,13 +34,13 @@ for arg in "$@"; do
 done
 
 # Check for Docker
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: Docker not found. Please install Docker.${NC}"
+if ! command -v docker >/dev/null 2>&1; then
+    printf "%bError: Docker not found. Please install Docker.%b\n" "$RED" "$NC"
     exit 1
 fi
 
-if ! docker info &> /dev/null 2>&1; then
-    echo -e "${RED}Error: Docker daemon not running. Please start Docker.${NC}"
+if ! docker info >/dev/null 2>&1; then
+    printf "%bError: Docker daemon not running. Please start Docker.%b\n" "$RED" "$NC"
     exit 1
 fi
 
@@ -49,37 +48,25 @@ fi
 if [ ! -d "$KANNICH_CACHE_DIR" ]; then
     echo "Creating cache directory: $KANNICH_CACHE_DIR"
     mkdir -p "$KANNICH_CACHE_DIR" || {
-        echo -e "${RED}Error: Failed to create cache directory: $KANNICH_CACHE_DIR${NC}"
+        printf "%bError: Failed to create cache directory: $KANNICH_CACHE_DIR%b\n" "$RED" "$NC"
         exit 1
     }
 fi
 
 # Verify cache directory is accessible
 if [ ! -d "$KANNICH_CACHE_DIR" ]; then
-    echo -e "${RED}Error: Cache directory not accessible: $KANNICH_CACHE_DIR${NC}"
+    printf "%bError: Cache directory not accessible: $KANNICH_CACHE_DIR%b\n" "$RED" "$NC"
     exit 1
 fi
 
 # Pull image if not present
-if ! docker image inspect "$KANNICH_IMAGE" &> /dev/null; then
-    echo -e "${YELLOW}Pulling Kannich builder image...${NC}"
+if ! docker image inspect "$KANNICH_IMAGE" >/dev/null 2>&1; then
+    printf "%bPulling Kannich builder image...%b\n" "$YELLOW" "$NC"
     docker pull "$KANNICH_IMAGE"
 fi
 
-# Convert paths to Docker-compatible format if running on Windows (MSYS/Git Bash)
-PROJECT_DOCKER_PATH="$PROJECT_DIR"
-CACHE_DOCKER_PATH="$KANNICH_CACHE_DIR"
-
 # Host .m2 repository path for dev mode
 HOST_M2_REPO="${HOME}/.m2/repository"
-M2_DOCKER_PATH="$HOST_M2_REPO"
-
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-    # Convert D:\foo to /d/foo
-    PROJECT_DOCKER_PATH=$(echo "$PROJECT_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
-    CACHE_DOCKER_PATH=$(echo "$KANNICH_CACHE_DIR" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
-    M2_DOCKER_PATH=$(echo "$HOST_M2_REPO" | sed -e 's/^\([A-Za-z]\):/\/\L\1/' -e 's/\\/\//g')
-fi
 
 # Container name for cleanup
 CONTAINER_NAME="kannich-$$"
@@ -152,11 +139,11 @@ trap cleanup EXIT INT TERM
 DEV_MODE_MOUNT=""
 if [ "$DEV_MODE" -eq 1 ]; then
     if [ ! -d "$HOST_M2_REPO" ]; then
-        echo -e "${RED}Error: Dev mode requires ~/.m2/repository to exist.${NC}"
-        echo -e "Run 'mkdir -p ~/.m2/repository' or 'mvn install' on a project first."
+        printf "%bError: Dev mode requires ~/.m2/repository to exist.%b\n" "$RED" "$NC"
+        echo "Run 'mkdir -p ~/.m2/repository' or 'mvn install' on a project first."
         exit 1
     fi
-    DEV_MODE_MOUNT="-v $M2_DOCKER_PATH:/kannich/dev-repo"
+    DEV_MODE_MOUNT="-v $HOST_M2_REPO:/kannich/dev-repo"
 fi
 
 # Run Kannich inside Docker
@@ -166,8 +153,8 @@ fi
 docker run --rm -it \
     --init \
     --name "$CONTAINER_NAME" \
-    -v "$PROJECT_DOCKER_PATH:/workspace" \
-    -v "$CACHE_DOCKER_PATH:/kannich/cache" \
+    -v "$PROJECT_DIR:/workspace" \
+    -v "$KANNICH_CACHE_DIR:/kannich/cache" \
     $DOCKER_SOCKET_MOUNT \
     $DEV_MODE_MOUNT \
     $ENV_ARGS \
