@@ -13,6 +13,7 @@ import dev.kannich.stdlib.SequentialSteps
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.timedSuspend
 import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.toUnixString
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
@@ -20,8 +21,7 @@ import java.nio.file.Path
 import kotlin.io.path.createParentDirectories
 
 /**
- * Executes Kannich pipelines inside Docker containers.
- * Handles job orchestration, overlay isolation, and artifact collection.
+ * Executes Kannich pipelines. Handles job orchestration, overlay isolation, and artifact collection.
  */
 class ExecutionEngine(
     private val artifactsDir: Path,
@@ -36,122 +36,79 @@ class ExecutionEngine(
         val execution = pipeline.executions[executionName]
             ?: throw IllegalArgumentException("Execution not found: $executionName")
 
+        // first create initial layer, as we don't modify the working copy
+        val initialLayerId = LayerManager.createJobLayer()
 
-        return executeSteps(execution.steps, pipeline)
-    }
-
-    private fun executeSteps(
-        steps: List<ExecutionStep>,
-        pipeline: Pipeline,
-        parentLayerId: String? = null
-    ): Boolean {
-        var currentLayerId = parentLayerId
-        val layersToCleanup = mutableListOf<String>()
-
-        try {
-            for (step in steps) {
-                val result = when (step) {
-                    is JobExecutionStep -> {
-                        val (execResult, newLayerId) = executeJob(step.job, currentLayerId)
-                        if (execResult && newLayerId != null) {
-                            // Track old layer for cleanup, use new layer for next job
-                            currentLayerId?.let { layersToCleanup.add(it) }
-                            currentLayerId = newLayerId
-                        }
-                        execResult
-                    }
-
-                    is ExecutionReference -> {
-                        val refExecution = step.execution
-                        executeSteps(refExecution.steps, pipeline, currentLayerId)
-                    }
-
-                    is SequentialSteps -> executeSequential(step.steps, pipeline, currentLayerId)
-                    is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
-                }
-
-                if (!result) {
-                    return result
-                }
-            }
-
-            return true
-        } finally {
-            // Cleanup intermediate layers
-            layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
-            // Cleanup final layer
-            currentLayerId?.let { LayerManager.removeJobLayer(it) }
-        }
+        return executeSequential(execution.steps, initialLayerId)
     }
 
     private fun executeSequential(
         steps: List<ExecutionStep>,
-        pipeline: Pipeline,
-        parentLayerId: String? = null
+        layerId: String
     ): Boolean {
-        var currentLayerId = parentLayerId
-        val layersToCleanup = mutableListOf<String>()
-
-        try {
-            for (step in steps) {
-                val result = when (step) {
-                    is JobExecutionStep -> {
-                        val (execResult, newLayerId) = executeJob(step.job, currentLayerId)
-                        if (execResult && newLayerId != null) {
-                            currentLayerId?.let { layersToCleanup.add(it) }
-                            currentLayerId = newLayerId
-                        }
-                        execResult
-                    }
-
-                    is ExecutionReference -> executeSteps(step.execution.steps, pipeline, currentLayerId)
-                    is SequentialSteps -> executeSequential(step.steps, pipeline, currentLayerId)
-                    is ParallelSteps -> executeParallel(step.steps, pipeline, currentLayerId)
-                }
-
-                if (!result) {
-                    return result
-                }
+        // sequential steps don't need new layers, they can just work on the same layer one after another
+        for ((index, step) in steps.withIndex()) {
+            val result = when (step) {
+                // simple job execution, run it on the layer
+                is JobExecutionStep -> executeJob(step.job, LayerManager.getLayerWorkDir(layerId))
+                // an execution is implicitly sequential, so just run its steps
+                is ExecutionReference -> executeSequential(step.execution.steps, layerId)
+                // same thing for sequential steps
+                is SequentialSteps -> executeSequential(step.steps, layerId)
+                // and parallel steps we have to execute in parallel
+                is ParallelSteps -> executeParallel(step.steps, layerId)
             }
-            return true
-        } finally {
-            layersToCleanup.forEach { LayerManager.removeJobLayer(it) }
-            currentLayerId?.let { LayerManager.removeJobLayer(it) }
+            // break on first failure
+            if (!result) {
+                return false
+            }
         }
+        return true
     }
 
     private fun executeParallel(
         steps: List<ExecutionStep>,
-        pipeline: Pipeline,
-        parentLayerId: String? = null
+        parentLayerId: String? = null,
     ): Boolean {
-        // Parallel jobs each get their own layer branching from the same parent
+        // for parallel steps we need to create a new layer for each child job, based on the parent layer
+        // so that the parallel jobs don't interfere with each other.
+        // after all jobs are done, we apply the changes to the parent layer in the order in which
+        // the jobs are defined in the pipeline. afterwards we delete the parallel layers.
+
+        val parallelLayerIds = mutableListOf<String>()
         val results = runBlocking {
             steps.map { step ->
                 async(Dispatchers.IO) {
+                    val layerId = LayerManager.createJobLayer(parentLayerId)
+                    parallelLayerIds.add(layerId)
+
+                    // this is pretty much the same as sequential execution, but we need to pass the layer ID to the child steps
                     when (step) {
-                        is JobExecutionStep -> executeJob(step.job, parentLayerId).first
-                        is ExecutionReference -> executeSteps(step.execution.steps, pipeline, parentLayerId)
-                        is SequentialSteps -> executeSequential(step.steps, pipeline, parentLayerId)
-                        is ParallelSteps -> executeParallel(step.steps, pipeline, parentLayerId)
+                        is JobExecutionStep -> executeJob(step.job, LayerManager.getLayerWorkDir(layerId))
+                        is ExecutionReference -> executeSequential(step.execution.steps, layerId)
+                        is SequentialSteps -> executeSequential(step.steps, layerId)
+                        is ParallelSteps -> executeParallel(step.steps, layerId)
                     }
                 }
             }.awaitAll()
         }
-        // success if all children succeeded
-        return results.all { it }
+
+        // if not all jobs succeeded, return false, don't bother deleting the layers as we'll terminate soon anyways.
+        if (!results.all { it }) {
+            return false
+        }
+
+        // now we find out what has changed and apply this to our original layer (e.g. we merge the changes)
+        // TODO implement
+        // TODO if this parallel step was the last step in the pipeline we can skip the merge
+
+        // finally, clear the parallel layers
+        parallelLayerIds.forEach { LayerManager.removeJobLayer(it) }
+        return true
     }
 
-    /**
-     * Executes a job in its own layer.
-     * Returns the execution result and the layer ID (for chaining to following jobs).
-     */
-    private fun executeJob(job: Job, parentLayerId: String? = null): Pair<Boolean, String?> {
+    private fun executeJob(job: Job, workDir:String): Boolean {
         logger.info("Running job: ${job.name}")
-
-        // Create job layer from parent (or workspace if no parent)
-        val layerId = LayerManager.createJobLayer(parentLayerId)
-        val workDir = LayerManager.getLayerWorkDir(layerId)
 
         // Create job context
         val jobCtx = JobContext(
@@ -159,9 +116,7 @@ class ExecutionEngine(
             workingDir = workDir
         )
 
-
         // Execute job block with context
-        var success = true
         val scope = JobScope(job.name)
 
         try {
@@ -181,25 +136,18 @@ class ExecutionEngine(
                     }
                 }
             }
+            return true
         } catch (e: JobFailedException) {
             logger.warn("Job failed: ${e.message}")
-            success = false
+            return false
         } catch (e: Exception) {
             logger.error("Unexpected error in job: ${e.message}", e)
-            success = false
+            return false
         } finally {
             // Run cleanup actions regardless of job success/failure
             runBlocking(jobCtx) {
                 jobCtx.runCleanup()
             }
-        }
-
-        // Return layer ID only on success (for chaining), cleanup handled by caller
-        return if (success) {
-            Pair(true, layerId)
-        } else {
-            LayerManager.removeJobLayer(layerId)
-            Pair(false, null)
         }
     }
 
@@ -232,18 +180,8 @@ class ExecutionEngine(
         // Log and copy matched artifacts
         for (path in safePaths) {
             logger.info("Matched artifact: $path")
-            val target = artifactsDir.resolve(path)
-            target.createParentDirectories()
-            Files.copy(Path.of(workDir, path), target)
+            Fs.copy(path, artifactsDir.resolve(path).toUnixString())
         }
-
     }
 }
 
-data class ExecutionResult(
-    val success: Boolean
-)
-
-data class JobResult(
-    val success: Boolean
-)
