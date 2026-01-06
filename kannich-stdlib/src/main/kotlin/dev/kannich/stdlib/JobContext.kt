@@ -3,6 +3,7 @@ package dev.kannich.stdlib
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.Closeable
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 
@@ -98,7 +99,7 @@ class JobContext(
      * Exceptions during cleanup are logged but don't prevent other cleanups from running.
      * Used by ExecutionEngine after job execution.
      */
-    suspend fun runCleanup() {
+    suspend fun close() {
         cleanupActions.asReversed().forEach { action ->
             runCatching { action() }.onFailure { e ->
                 logger.warn("Cleanup action failed: ${e.message}")

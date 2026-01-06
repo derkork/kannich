@@ -1,13 +1,8 @@
 package dev.kannich.stdlib.util
 
-import dev.kannich.stdlib.util.ExecResult
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.BufferedReader
-import java.io.File
-import java.io.InputStream
-import java.io.InputStreamReader
-import java.io.StringWriter
+import java.io.*
 
 object ProcessUtil {
     private val logger: Logger = LoggerFactory.getLogger(ProcessUtil::class.java)
@@ -26,7 +21,7 @@ object ProcessUtil {
         workingDir: String = "/workspace",
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
-    ): ExecResult {
+    ): Result<ExecResult> = runCatching {
         if (!silent) {
             logger.info("Executing: ${command.joinToString(" ")}")
         } else {
@@ -55,7 +50,7 @@ object ProcessUtil {
         stdOut.join()
         stdErr.join()
 
-        return ExecResult(stdOut.toString(), stdErr.toString(), exitCode)
+        ExecResult(stdOut.toString(), stdErr.toString(), exitCode)
     }
 
     /**
@@ -66,7 +61,7 @@ object ProcessUtil {
         workingDir: String = "/workspace",
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
-    ): ExecResult {
+    ): Result<ExecResult> {
         return exec(listOf("sh", "-c", command), workingDir, env, silent)
     }
 }

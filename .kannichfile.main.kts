@@ -97,7 +97,11 @@ pipeline {
 
     execution("test") {
         job("test") {
+            Fs.write("noot.txt", "noot")
             log("Hello world!")
+            artifacts {
+                includes("noot.txt")
+            }
         }
     }
 }

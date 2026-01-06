@@ -1,6 +1,7 @@
 package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.JobContext
+import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.ExecResult
 import dev.kannich.stdlib.util.ProcessUtil
 
@@ -24,7 +25,9 @@ object Shell {
     ): ExecResult {
         val ctx = JobContext.current()
         val fullCommand = listOf(command) + args.toList()
-        return ProcessUtil.exec(fullCommand, ctx.workingDir, ctx.env, silent)
+        return ProcessUtil.exec(fullCommand, ctx.workingDir, ctx.env, silent).getOrElse {
+            fail("Failed to execute command: $command ${args.joinToString(" ")}")
+        }
     }
 
     /**
@@ -40,6 +43,8 @@ object Shell {
         silent: Boolean = false
     ): ExecResult {
         val ctx = JobContext.current()
-        return ProcessUtil.execShell(command, ctx.workingDir, ctx.env, silent)
+        return ProcessUtil.execShell(command, ctx.workingDir, ctx.env, silent).getOrElse {
+            fail("Failed to execute shell command: $command")
+        }
     }
 }

@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.absolute
 import kotlin.system.exitProcess
 
 class KannichCommand : CliktCommand(name = "kannich") {
@@ -42,6 +43,10 @@ class KannichCommand : CliktCommand(name = "kannich") {
     override fun run() {
         configureLogging()
         logger.info("Kannich ${Version.VERSION}")
+
+        if (devMode) {
+            logger.info("Dev mode enabled.")
+        }
 
         if (execution == null && !list) {
             logger.info("Usage: kannich [OPTIONS] <execution>")
@@ -112,19 +117,10 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // Run the execution
         logger.info("Running execution: $execution")
 
-        val executionEngine = ExecutionEngine(Path.of(artifactsDir), extraEnv)
+        val executionEngine = ExecutionEngine(Path.of(artifactsDir).absolute(), extraEnv)
 
-        try {
-            val executionResult = executionEngine.runExecution(pipeline, execution!!)
-
-            if (executionResult) {
-                logger.info("Execution completed successfully.")
-            } else {
-                logger.error("Execution failed.")
-                exitProcess(1)
-            }
-        } catch (e: Exception) {
-            logger.error("Error during execution: ${e.message}")
+        executionEngine.runExecution(pipeline, execution!!).getOrElse {
+            logger.error("Execution failed: ${it.message}")
             exitProcess(1)
         }
     }
@@ -153,6 +149,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
     }
 
     private fun configureLogging() {
+        logger.info("Configuring logging... $verbose")
         val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
         val kannichLogger = LoggerFactory.getLogger("dev.kannich") as Logger
 
@@ -198,15 +195,18 @@ class KannichCommand : CliktCommand(name = "kannich") {
                     val desc = if (!job.description.isNullOrBlank()) " - ${job.description}" else ""
                     logger.info("$indent$prefix[J] ${job.name}$desc")
                 }
+
                 is ExecutionReference -> {
                     val exec = step.execution
                     val desc = if (!exec.description.isNullOrBlank()) " - ${exec.description}" else ""
                     logger.info("$indent$prefix[E] ${exec.name}$desc")
                     printSteps(exec.steps, indent + if (inParallel) "|   " else "  ")
                 }
+
                 is SequentialSteps -> {
                     printSteps(step.steps, indent, inParallel)
                 }
+
                 is ParallelSteps -> {
                     printSteps(step.steps, indent, true)
                 }

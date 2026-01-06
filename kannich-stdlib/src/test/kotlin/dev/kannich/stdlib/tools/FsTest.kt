@@ -22,30 +22,6 @@ class FsTest : TestBase() {
         root = tempDir.toFile()
     }
 
-
-    @Test
-    fun `test resolve null`() = withJobContext("/test/dir") {
-        assertEquals(Path.of("/test/dir").toUnixString(), Fs.resolve(null))
-    }
-
-    @Test
-    fun `test resolve empty`() = withJobContext("/test/dir") {
-        assertEquals(Path.of("/test/dir").toUnixString(), Fs.resolve(""))
-    }
-
-    @Test
-    fun `test resolve absolute`() = withJobContext("/test/dir") {
-        val absolutePath = "/absolute/path"
-        assertEquals(Path.of(absolutePath).toUnixString(), Fs.resolve(absolutePath))
-    }
-
-    @Test
-    fun `test resolve relative`() = withJobContext("/test/dir") {
-        val workingDir = "/test/dir"
-        val relativePath = "sub/path"
-        assertEquals(Path.of(workingDir).resolve(relativePath).toUnixString(), Fs.resolve(relativePath))
-    }
-
     @Test
     fun `test mkdir`() = withJobContext(tempDir.toString()) {
         val dirPath = "new/deep/dir"

@@ -1,9 +1,16 @@
 package dev.kannich.stdlib
 
+enum class On {
+    SUCCESS,
+    FAILURE,
+    SUCCESS_OR_FAILURE
+}
+
 /**
  * Specifies which files to collect as build artifacts.
  */
 class ArtifactSpec internal constructor(
+    val collect: On,
     val includes: List<String>,
     val excludes: List<String>
 )
@@ -17,7 +24,7 @@ class ArtifactSpec internal constructor(
  * - `?` matches a single character
  */
 @KannichDsl
-class ArtifactSpecBuilder {
+class ArtifactSpecBuilder(private val collect: On = On.SUCCESS) {
     private val includes = mutableListOf<String>()
     private val excludes = mutableListOf<String>()
 
@@ -35,5 +42,5 @@ class ArtifactSpecBuilder {
         excludes.addAll(patterns)
     }
 
-    internal fun build(): ArtifactSpec = ArtifactSpec(includes.toList(), excludes.toList())
+    internal fun build(): ArtifactSpec = ArtifactSpec(collect, includes.toList(), excludes.toList())
 }

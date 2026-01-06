@@ -25,8 +25,8 @@ class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) "
      *
      * Only files within the workspace directory can be collected as artifacts.
      */
-    fun artifacts(block: ArtifactSpecBuilder.() -> Unit) {
-        val spec = ArtifactSpecBuilder().apply(block).build()
+    fun artifacts(collect: On = On.SUCCESS, block: ArtifactSpecBuilder.() -> Unit) {
+        val spec = ArtifactSpecBuilder(collect).apply(block).build()
         artifactSpecs.add(spec)
     }
 

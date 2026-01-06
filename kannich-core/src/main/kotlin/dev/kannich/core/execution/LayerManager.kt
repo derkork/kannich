@@ -1,9 +1,11 @@
 package dev.kannich.core.execution
 
+import dev.kannich.stdlib.util.ExecResult
+import dev.kannich.stdlib.util.FsUtil
 import dev.kannich.stdlib.util.ProcessUtil
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.IOException
+import java.nio.file.FileVisitOption
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -25,7 +27,7 @@ object LayerManager {
      *
      * @param parentLayerId Optional parent layer to base on. If null, uses /workspace.
      */
-    fun createJobLayer(parentLayerId: String? = null): String {
+    fun createJobLayer(parentLayerId: String? = null): Result<String> {
         val layerId = "layer-${UUID.randomUUID().toString().replace("-", "")}"
         val layerDir = "/kannich/overlays/$layerId"
         val lowerDir = if (parentLayerId != null) {
@@ -37,13 +39,9 @@ object LayerManager {
         logger.debug("Creating job layer: $layerId (from ${parentLayerId ?: "workspace"})")
 
         // Create layer subdirectories: upper (changes), work (overlayfs internal), merged (view)
-        val mkdirResult = ProcessUtil.execShell(
-            command = "mkdir -p $layerDir/upper $layerDir/work $layerDir/merged",
-            silent = true
-        )
-        if (!mkdirResult.success) {
-            throw IllegalStateException("Failed to create layer directories: ${mkdirResult.stderr}")
-        }
+        FsUtil.mkdir(Path.of(layerDir, "upper")).getOrElse { return Result.failure(it) }
+        FsUtil.mkdir(Path.of(layerDir, "work")).getOrElse { return Result.failure(it) }
+        FsUtil.mkdir(Path.of(layerDir, "merged")).getOrElse { return Result.failure(it) }
 
         // Mount fuse-overlayfs
         val mountResult = ProcessUtil.execShell(
@@ -51,12 +49,15 @@ object LayerManager {
             silent = true
         )
 
-        if (!mountResult.success) {
-            ProcessUtil.execShell("rm -rf $layerDir", silent = true)
+        if (!mountResult.fold({it.success}, {false})) {
+            FsUtil.delete(Path.of(layerDir)).onFailure { e ->
+                logger.warn("Failed to delete layer directory $layerDir after failed mount: ${e.message}")
+            }
+            return Result.failure(Exception("Failed to mount layer $layerId"))
         }
 
         logger.debug("Created job layer: $layerId")
-        return layerId
+        return Result.success(layerId)
     }
 
     /**
@@ -75,43 +76,66 @@ object LayerManager {
     }
 
     /**
-     * Finds modifications and deletions inside a job layer and returns a list of modified and deleted file paths.
+     * Finds modifications and deletions inside a job layer and fills the given sets of modified and deleted file paths,
+     * relative to the layer root. If a directory was deleted, only the directory will be added to the deletedPaths,
+     * not all of its contents. Sets are automatically cleared before the operation.
      */
-    fun findLayerModifications(layerId: String, modifications: MutableList<Path>, deletions: MutableList<Path>) {
-        // just in case, clear the lists first
-        modifications.clear()
-        deletions.clear()
+    fun findLayerModifications(layerId: String, modifiedFiles: MutableSet<Path>, deletedPaths: MutableSet<Path>) : Result<Unit> = runCatching {
+        // just in case, clear the sets first
+        modifiedFiles.clear()
+        deletedPaths.clear()
         // the upper layer directory contains the changes made by the job
         val upperDir = Path.of(getLayerUpperDir(layerId))
-        // first find all deleted paths
-        findDeleted(upperDir, deletions)
-        // then do another walk and filter out deleted paths
-        modifications.addAll(Files.walk(upperDir).filter { !deletions.contains(it) }.toList())
+        findModified(upperDir, modifiedFiles)
+        findDeleted(upperDir, deletedPaths)
+    }
+
+    /**
+     * Returns absolute paths of every modified file inside the upper layer directory.
+     */
+    private fun findModified(upperDir: Path, results: MutableSet<Path>) {
+        Files.walkFileTree(upperDir, object : SimpleFileVisitor<Path>() {
+            override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (isOpaqueDir(dir)) {
+                    return FileVisitResult.SKIP_SUBTREE
+                }
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (!isWhiteout(file)) {
+                    results.add(file.relativize(upperDir))
+                }
+                return FileVisitResult.CONTINUE
+            }
+        })
     }
 
     /**
      * Returns absolute paths of every deleted file/directory inside the upper layer directory.
      * See: https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
      */
-    private fun findDeleted(upperDir: Path, results:MutableList<Path>) {
+    private fun findDeleted(upperDir: Path, results: MutableSet<Path>) {
         Files.walkFileTree(upperDir, object : SimpleFileVisitor<Path>() {
+
+            override fun preVisitDirectory(
+                dir: Path,
+                attrs: BasicFileAttributes
+            ): FileVisitResult {
+                if (isOpaqueDir(dir)) {
+                    results.add(dir.relativize(upperDir))
+                    // if the directory was deleted, we don't need to visit its children
+                    return FileVisitResult.SKIP_SUBTREE
+                }
+                return FileVisitResult.CONTINUE
+            }
 
             override fun visitFile(
                 file: Path,
                 attrs: BasicFileAttributes
             ): FileVisitResult {
-                if (isWhiteout(file) || isOpaqueDir(file)) {
-                    results.add(file.toAbsolutePath().normalize())
-                }
-                return FileVisitResult.CONTINUE
-            }
-
-            override fun postVisitDirectory(
-                dir: Path,
-                exc: IOException?
-            ): FileVisitResult {
-                if (isOpaqueDir(dir)) {
-                    results.add(dir.toAbsolutePath().normalize())
+                if (isWhiteout(file)) {
+                    results.add(file.relativize(upperDir))
                 }
                 return FileVisitResult.CONTINUE
             }
@@ -157,19 +181,21 @@ object LayerManager {
      * Removes a job layer.
      * Unmounts the overlayfs before removing directories.
      */
-    fun removeJobLayer(layerId: String) {
+    fun removeJobLayer(layerId: String) :Result<Unit>  {
         val layerDir = "/kannich/overlays/$layerId"
 
         // Unmount overlayfs first (fusermount -u for fuse-overlayfs)
         // Use -z (lazy) to detach immediately even if busy - cleanup happens when no longer in use
-        val unmountResult = ProcessUtil.execShell("fusermount -uz $layerDir/merged", silent = true)
+        val unmountResult = ProcessUtil.execShell("fusermount -uz $layerDir/merged", silent = true).getOrElse { return Result.failure(it) }
+
         if (!unmountResult.success) {
             logger.warn("Failed to unmount layer $layerId: ${unmountResult.stderr}")
         }
 
         // Remove layer directory
-        ProcessUtil.execShell("rm -rf $layerDir", silent = true)
+        ProcessUtil.execShell("rm -rf $layerDir", silent = true).getOrElse { return Result.failure(it) }
         logger.debug("Removed job layer: $layerId")
+        return Result.success(Unit)
     }
 
 }
