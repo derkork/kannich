@@ -9,7 +9,6 @@ $Arguments = $args
 
 # Configuration
 $KannichImage = if ($env:KANNICH_IMAGE) { $env:KANNICH_IMAGE } else { "derkork/kannich:latest" }
-$KannichCacheDir = if ($env:KANNICH_CACHE_DIR) { $env:KANNICH_CACHE_DIR } else { Join-Path $env:USERPROFILE ".kannich\cache" }
 $DefaultEnvPrefixes = @("CI_", "GITHUB_", "BUILD_", "CIRCLE_", "TRAVIS_", "BITBUCKET_", "KANNICH_")
 
 # Determine project directory
@@ -41,15 +40,30 @@ if ($dockerExitCode -ne 0) {
     exit 1
 }
 
-# Ensure cache directory exists
-if (-not (Test-Path $KannichCacheDir)) {
-    Write-Host "Creating cache directory: $KannichCacheDir"
-    try {
-        New-Item -ItemType Directory -Path $KannichCacheDir -Force | Out-Null
-    } catch {
-        Write-Error "Error: Failed to create cache directory: $KannichCacheDir"
-        exit 1
+# Ensure cache exists
+if ($env:KANNICH_CACHE_DIR) {
+    $KannichCacheDir = $env:KANNICH_CACHE_DIR
+    if (-not (Test-Path $KannichCacheDir)) {
+        Write-Host "Creating cache directory: $KannichCacheDir"
+        try {
+            New-Item -ItemType Directory -Path $KannichCacheDir -Force | Out-Null
+        } catch {
+            Write-Error "Error: Failed to create cache directory: $KannichCacheDir"
+            exit 1
+        }
     }
+    $KannichCacheDirDocker = $KannichCacheDir -replace '\\', '/'
+    $CacheMount = @("-v", "${KannichCacheDirDocker}:/kannich/cache")
+} else {
+    $ErrorActionPreference = "Continue"
+    $null = docker volume inspect kannich-cache 2>&1
+    $volumeExists = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = "Stop"
+    if (-not $volumeExists) {
+        Write-Host "Creating docker volume: kannich-cache"
+        docker volume create kannich-cache | Out-Null
+    }
+    $CacheMount = @("-v", "kannich-cache:/kannich/cache")
 }
 
 # Pull image if not present
@@ -158,7 +172,6 @@ if ($DevMode) {
 
 # Convert Windows paths to Docker-compatible format
 $ProjectDirDocker = $ProjectDir -replace '\\', '/'
-$KannichCacheDirDocker = $KannichCacheDir -replace '\\', '/'
 
 # Build the docker command arguments
 $dockerArgs = @(
@@ -166,9 +179,9 @@ $dockerArgs = @(
     "--init",
     "--name", $ContainerName,
     "--privileged",
-    "-v", "${ProjectDirDocker}:/workspace",
-    "-v", "${KannichCacheDirDocker}:/kannich/cache"
+    "-v", "${ProjectDirDocker}:/workspace"
 )
+$dockerArgs += $CacheMount
 
 $dockerArgs += $DockerSocketMount
 $dockerArgs += $DockerCertMount

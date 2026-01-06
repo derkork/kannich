@@ -3,6 +3,7 @@
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.util.FsUtil
+import dev.kannich.stdlib.util.FsKind
 import dev.kannich.stdlib.util.toUnixString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -188,6 +189,18 @@ object Fs {
     }
 
     /**
+     * Reads text content from a file.
+     */
+    suspend fun readAsString(path:String):String {
+        val target = resolvePath(path)
+        return withContext(Dispatchers.IO) {
+            FsUtil.readAsString(target).getOrElse { e ->
+                fail("Failed to read $path: ${e.message}")
+            }
+        }
+    }
+
+    /**
      * Finds files matching ant-style glob patterns.
      *
      * Pattern syntax:
@@ -200,16 +213,18 @@ object Fs {
      * @param includes Patterns for files to include
      * @param excludes Patterns for files to exclude (default: empty)
      * @param baseDir Base directory to search from (default: current working directory)
+     * @param kind The kind of paths to return (default: File)
      * @return List of relative paths matching the patterns
      */
     suspend fun glob(
         includes: List<String>,
         excludes: List<String> = emptyList(),
-        baseDir: String? = null
+        baseDir: String? = null,
+        kind: FsKind = FsKind.File
     ): List<String> {
         val rootPath = resolvePath(baseDir ?: "")
         return withContext(Dispatchers.IO) {
-            FsUtil.glob(includes, excludes, rootPath).getOrElse { e ->
+            FsUtil.glob(includes, excludes, rootPath, kind).getOrElse { e ->
                 fail("Failed to find files with glob: ${e.message}")
             }
         }
@@ -220,12 +235,13 @@ object Fs {
      *
      * @param pattern The pattern to match
      * @param baseDir Base directory to search from (default: current working directory)
+     * @param kind The kind of paths to return (default: File)
      * @return List of relative paths matching the pattern
      */
-    suspend fun glob(pattern: String, baseDir: String? = null): List<String> {
+    suspend fun glob(pattern: String, baseDir: String? = null, kind: FsKind = FsKind.File): List<String> {
         val rootPath = resolvePath(baseDir ?: "")
         return withContext(Dispatchers.IO) {
-            FsUtil.glob(pattern, rootPath).getOrElse { e ->
+            FsUtil.glob(pattern, rootPath, kind).getOrElse { e ->
                 fail("Failed to find files with glob pattern $pattern: ${e.message}")
             }
         }

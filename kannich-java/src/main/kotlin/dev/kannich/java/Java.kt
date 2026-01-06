@@ -6,6 +6,8 @@ import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Fs
 import dev.kannich.stdlib.tools.Shell
+import dev.kannich.stdlib.tools.Web
+import dev.kannich.stdlib.util.FsKind
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -57,10 +59,12 @@ class Java(val version: String) {
         // Using Eclipse Temurin (Adoptium) for reliable downloads
         val downloadUrl = getDownloadUrl(version)
         val javaDir = Cache.path(CACHE_KEY)
-        Compressor.downloadAndExtract(downloadUrl, javaDir)
+        val archive = Web.download(downloadUrl, "java.tar.gz")
+        Compressor.extract(archive, javaDir)
 
         // Adoptium extracts to directories like "jdk-21.0.5+11", rename to our expected name
-        Fs.move("$javaDir/jdk-${version}*", Cache.path(cacheKey))
+        val folder = Fs.glob("jdk-${version}*", javaDir, kind = FsKind.Folder).first()
+        Fs.move("$javaDir/$folder", Cache.path(cacheKey))
 
         logger.info("Successfully installed Java $version.")
     }

@@ -8,6 +8,7 @@ import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Shell
 import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Fs
+import dev.kannich.stdlib.tools.Web
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -127,7 +128,8 @@ class Maven(
         // Apache Maven tarballs extract to "apache-maven-$version" which matches our cache key
         val downloadUrl = getDownloadUrl(version)
         val mavenDir = Cache.path(CACHE_KEY)
-        Compressor.downloadAndExtract(downloadUrl, mavenDir)
+        val archive = Web.download(downloadUrl, "maven.tar.gz")
+        Compressor.extract(archive, mavenDir)
 
         // Verify extraction succeeded
         if (!Cache.exists(cacheKey)) {

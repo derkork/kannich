@@ -5,6 +5,7 @@ import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Fs
 import dev.kannich.stdlib.tools.Shell
+import dev.kannich.stdlib.tools.Web
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -73,7 +74,8 @@ class Trivy(val version: String) {
 
         // Download and extract Trivy
         val downloadUrl = getDownloadUrl(version)
-        Compressor.downloadAndExtract(downloadUrl, trivyDir)
+        val archive = Web.download(downloadUrl)
+        Compressor.extract(archive, trivyDir)
 
         // Verify extraction succeeded - trivy binary should exist
         val trivyBinary = "$trivyDir/trivy"

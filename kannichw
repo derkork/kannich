@@ -7,7 +7,6 @@ set -e
 
 # Configuration
 KANNICH_IMAGE="${KANNICH_IMAGE:-derkork/kannich:latest}"
-KANNICH_CACHE_DIR="${KANNICH_CACHE_DIR:-$HOME/.kannich/cache}"
 DEFAULT_ENV_PREFIXES="CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_ KANNICH_"
 
 # Determine project directory
@@ -33,13 +32,22 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-# Ensure cache directory exists
-if [ ! -d "$KANNICH_CACHE_DIR" ]; then
-    echo "Creating cache directory: $KANNICH_CACHE_DIR"
-    mkdir -p "$KANNICH_CACHE_DIR" || {
-        echo "Error: Failed to create cache directory: $KANNICH_CACHE_DIR" >&2
-        exit 1
-    }
+# Ensure cache exists
+if [ -n "$KANNICH_CACHE_DIR" ]; then
+    if [ ! -d "$KANNICH_CACHE_DIR" ]; then
+        echo "Creating cache directory: $KANNICH_CACHE_DIR"
+        mkdir -p "$KANNICH_CACHE_DIR" || {
+            echo "Error: Failed to create cache directory: $KANNICH_CACHE_DIR" >&2
+            exit 1
+        }
+    fi
+    CACHE_MOUNT="$KANNICH_CACHE_DIR:/kannich/cache"
+else
+    if ! docker volume inspect kannich-cache >/dev/null 2>&1; then
+        echo "Creating docker volume: kannich-cache"
+        docker volume create kannich-cache >/dev/null
+    fi
+    CACHE_MOUNT="kannich-cache:/kannich/cache"
 fi
 
 # Pull image if not present
@@ -149,7 +157,7 @@ docker run --rm \
     --name "$CONTAINER_NAME" \
     --privileged \
     -v "$PROJECT_DIR:/workspace" \
-    -v "$KANNICH_CACHE_DIR:/kannich/cache" \
+    -v "$CACHE_MOUNT" \
     $DOCKER_SOCKET_MOUNT \
     $DOCKER_CERT_MOUNT \
     $DEV_MODE_MOUNT \

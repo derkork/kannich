@@ -50,11 +50,8 @@ object Cache {
         if (key != null) {
             Fs.delete(path(key))
         } else {
-            // Clear all contents but keep the cache directory itself
-            val result = Shell.execShell("rm -rf ${baseDir()}/*")
-            if (!result.success) {
-                fail("Failed to clear cache: ${result.stderr}")
-            }
+            val contents = Fs.glob("*", Kannich.CACHE_DIR)
+            contents.forEach { Fs.delete(it) }
         }
     }
 

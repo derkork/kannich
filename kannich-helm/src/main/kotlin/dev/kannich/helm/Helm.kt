@@ -5,6 +5,7 @@ import dev.kannich.stdlib.tools.Cache
 import dev.kannich.stdlib.tools.Compressor
 import dev.kannich.stdlib.tools.Fs
 import dev.kannich.stdlib.tools.Shell
+import dev.kannich.stdlib.tools.Web
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -74,7 +75,8 @@ class Helm(val version: String) {
 
         // Download and extract Helm
         val downloadUrl = getDownloadUrl(version)
-        Compressor.downloadAndExtract(downloadUrl, helmDir)
+        val archive = Web.download(downloadUrl)
+        Compressor.extract(archive, helmDir)
 
         // Helm archives extract to linux-amd64/helm, move it to the right place
         val extractedBinary = "$helmDir/linux-amd64/helm"

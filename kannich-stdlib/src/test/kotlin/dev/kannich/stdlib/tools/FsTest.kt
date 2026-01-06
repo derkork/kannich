@@ -1,6 +1,7 @@
 ﻿package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.TestBase
+import dev.kannich.stdlib.util.FsKind
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -173,8 +174,22 @@ class FsTest : TestBase() {
     @Test
     fun `test matches directories too`() = withJobContext(root.absolutePath) {
         createGlobTestData()
-        val result = Fs.glob("src/*")
+        val result = Fs.glob("src/*", kind = FsKind.All)
         assertEquals(setOf("src/main", "src/test"), result.toSet())
+    }
+
+    @Test
+    fun `test glob kind folder`() = withJobContext(root.absolutePath) {
+        createGlobTestData()
+        val result = Fs.glob("src/*", kind = FsKind.Folder)
+        assertEquals(setOf("src/main", "src/test"), result.toSet())
+    }
+
+    @Test
+    fun `test glob kind file`() = withJobContext(root.absolutePath) {
+        createGlobTestData()
+        val result = Fs.glob("src/*", kind = FsKind.File)
+        assertTrue(result.isEmpty())
     }
 
     @Test

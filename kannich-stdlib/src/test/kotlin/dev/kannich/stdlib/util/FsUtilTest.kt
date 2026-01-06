@@ -164,6 +164,41 @@ class FsUtilTest {
     }
 
     @Test
+    fun `test glob kind file`() {
+        createGlobTestData()
+        val result = FsUtil.glob("src/*", root, FsKind.File).getOrThrow()
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `test glob kind folder`() {
+        createGlobTestData()
+        val result = FsUtil.glob("src/*", root, FsKind.Folder).getOrThrow()
+        assertEquals(setOf("src/main", "src/test"), result.toSet())
+    }
+
+    @Test
+    fun `test glob kind all`() {
+        createGlobTestData()
+        val result = FsUtil.glob("src/*", root, FsKind.All).getOrThrow()
+        assertEquals(setOf("src/main", "src/test"), result.toSet())
+    }
+
+    @Test
+    fun `test literal folder with kind file`() {
+        createGlobTestData()
+        val result = FsUtil.glob("src/main", root, FsKind.File).getOrThrow()
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `test literal folder with kind folder`() {
+        createGlobTestData()
+        val result = FsUtil.glob("src/main", root, FsKind.Folder).getOrThrow()
+        assertEquals(listOf("src/main"), result)
+    }
+
+    @Test
     fun `test delete file`() {
         val file = root.resolve("toDelete.txt")
         Files.write(file, "delete me".toByteArray())

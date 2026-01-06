@@ -9,6 +9,10 @@ import java.nio.file.attribute.BasicFileAttributes
 /**
  * Utility for filesystem operations. All operations work on absolute paths.
  */
+enum class FsKind {
+    File, Folder, All
+}
+
 object FsUtil {
     private val logger = LoggerFactory.getLogger(FsUtil::class.java)
 
@@ -152,18 +156,29 @@ object FsUtil {
     }
 
     /**
+     * Reads text content from a file.
+     */
+    fun readAsString(target: Path): Result<String> = runCatching {
+        logger.debug("Reading file: {}", target)
+        checkAbsolute(target)
+        Files.readString(target)
+    }
+
+    /**
      * Finds files matching ant-style glob patterns.
      */
     fun glob(
         includes: List<String>,
         excludes: List<String> = emptyList(),
-        rootPath: Path
+        rootPath: Path,
+        kind: FsKind = FsKind.File
     ): Result<List<String>> = runCatching {
         logger.debug(
-            "Finding files with glob: includes={}, excludes={}, rootPath={}",
+            "Finding files with glob: includes={}, excludes={}, rootPath={}, kind={}",
             includes,
             excludes,
-            rootPath
+            rootPath,
+            kind
         )
         checkAbsolute(rootPath)
 
@@ -176,10 +191,17 @@ object FsUtil {
         for (path in literalPaths) {
             val file = rootPath.resolve(path)
             if (Files.exists(file)) {
-                val matchesExclude = excludes.isNotEmpty() &&
-                        AntPathMatcher.matchesAny(excludes, path)
-                if (!matchesExclude) {
-                    matchingPaths.add(path)
+                val matchesKind = when (kind) {
+                    FsKind.File -> Files.isRegularFile(file)
+                    FsKind.Folder -> Files.isDirectory(file)
+                    FsKind.All -> true
+                }
+                if (matchesKind) {
+                    val matchesExclude = excludes.isNotEmpty() &&
+                            AntPathMatcher.matchesAny(excludes, path)
+                    if (!matchesExclude) {
+                        matchingPaths.add(path)
+                    }
                 }
             }
         }
@@ -225,7 +247,14 @@ object FsUtil {
                                     AntPathMatcher.matchesAny(excludes, relativePath)
 
                             if (matchesInclude && !matchesExclude) {
-                                matchingPaths.add(relativePath)
+                                val matchesKind = when (kind) {
+                                    FsKind.File -> Files.isRegularFile(file)
+                                    FsKind.Folder -> Files.isDirectory(file)
+                                    FsKind.All -> true
+                                }
+                                if (matchesKind) {
+                                    matchingPaths.add(relativePath)
+                                }
                             }
                         } catch (_: Exception) {
                             // Skip files that can't be made relative
@@ -241,8 +270,8 @@ object FsUtil {
     /**
      * Finds files matching a single ant-style glob pattern.
      */
-    fun glob(pattern: String, rootPath: Path): Result<List<String>> {
-        return glob(listOf(pattern), emptyList(), rootPath)
+    fun glob(pattern: String, rootPath: Path, kind: FsKind = FsKind.File): Result<List<String>> {
+        return glob(listOf(pattern), emptyList(), rootPath, kind)
     }
 }
 

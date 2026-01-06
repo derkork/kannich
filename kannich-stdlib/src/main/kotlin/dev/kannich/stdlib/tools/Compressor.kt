@@ -1,12 +1,14 @@
 package dev.kannich.stdlib.tools
 
 import dev.kannich.stdlib.fail
+import org.slf4j.LoggerFactory
 
 /**
  * Built-in tool for extracting archives.
  * Automatically detects archive format from file extension.
  */
 object Compressor {
+    private val logger = LoggerFactory.getLogger(Compressor::class.java)
 
     private enum class ArchiveFormat(val extensions: List<String>, val tarFlag: String?) {
         TAR_GZ(listOf(".tar.gz", ".tgz"), "z"),
@@ -41,6 +43,7 @@ object Compressor {
      * @throws dev.kannich.stdlib.JobFailedException if extraction fails or format is unsupported
      */
     suspend fun extract(archive: String, dest: String) {
+        logger.debug("Extracting $archive to $dest")
         Fs.mkdir(dest)
 
         val format = ArchiveFormat.detect(archive)
@@ -57,45 +60,4 @@ object Compressor {
         }
     }
 
-    /**
-     * Downloads and extracts an archive in one operation.
-     * More efficient than download + extract as it pipes directly without intermediate file.
-     *
-     * @param url The URL to download from
-     * @param dest The destination directory to extract to
-     * @param format The archive format (tar.gz, tar.xz, tar.bz2, tar, zip). If null, auto-detected from URL.
-     * @throws dev.kannich.stdlib.JobFailedException if download or extraction fails
-     */
-    suspend fun downloadAndExtract(url: String, dest: String, format: String? = null) {
-        Fs.mkdir(dest)
-
-        val archiveFormat = if (format != null) {
-            ArchiveFormat.entries.find { it.extensions.any { ext -> ext.endsWith(format) } }
-                ?: fail("Unsupported archive format: $format")
-        } else {
-            ArchiveFormat.detect(url) ?: ArchiveFormat.TAR_GZ // default for URLs without extensions
-        }
-
-        val result = when (archiveFormat) {
-            ArchiveFormat.ZIP, ArchiveFormat.GZ -> {
-                // zip and gz don't support piping, need to download first
-                val tempDir = Fs.mktemp("extract")
-                val ext = archiveFormat.extensions.first()
-                val tempFile = "$tempDir/archive$ext"
-                val extractResult = Shell.execShell("curl -sSLf -o '$tempFile' '$url'")
-                if (!extractResult.success) {
-                    Fs.delete(tempDir)
-                    fail("Failed to download $url: ${extractResult.stderr}")
-                }
-                extract(tempFile, dest)
-                Fs.delete(tempDir)
-                return
-            }
-            else -> Shell.execShell("curl -sSLf '$url' | tar x${archiveFormat.tarFlag}f - -C '$dest'")
-        }
-
-        if (!result.success) {
-            fail("Failed to download and extract $url: ${result.stderr}")
-        }
-    }
 }
