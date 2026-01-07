@@ -1,9 +1,9 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.2.0")
-@file:DependsOn("dev.kannich:kannich-tools:0.2.0")
-@file:DependsOn("dev.kannich:kannich-maven:0.2.0")
-@file:DependsOn("dev.kannich:kannich-java:0.2.0")
-@file:DependsOn("dev.kannich:kannich-trivy:0.2.0")
-@file:DependsOn("dev.kannich:kannich-helm:0.2.0")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.3.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.3.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.3.0")
+@file:DependsOn("dev.kannich:kannich-java:0.3.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.3.0")
+@file:DependsOn("dev.kannich:kannich-helm:0.3.0")
 
 
 import dev.kannich.java.Java
