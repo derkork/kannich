@@ -3,7 +3,6 @@ package dev.kannich.stdlib
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.Closeable
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 
@@ -20,6 +19,7 @@ class JobContext(
     private val logger = LoggerFactory.getLogger(JobContext::class.java)
 
     companion object {
+        suspend fun exists(): Boolean = currentCoroutineContext()[Key] != null
         suspend fun current(): JobContext = currentCoroutineContext()[Key]
             ?: error("No JobContext available. Are you inside a job block during execution?")
 

@@ -1,5 +1,8 @@
 package dev.kannich.stdlib
 
+import Env
+import EnvImpl
+
 /**
  * Represents an execution plan that orchestrates jobs.
  */
@@ -16,23 +19,17 @@ class ExecutionReference(val execution: Execution) : ExecutionStep
 class SequentialSteps(val steps: List<ExecutionStep>) : ExecutionStep
 class ParallelSteps(val steps: List<ExecutionStep>) : ExecutionStep
 
-class ExecutionBuilder(private val name: String, private val description: String? = null) : Logging by LoggingImpl("Execution $name") {
+class ExecutionBuilder(private val name: String, private val description: String? = null) : Logging by LoggingImpl("Execution $name"), Env by EnvImpl() {
     /**
      * The steps of the execution. These are executed in sequential order.
      */
     private val steps = mutableListOf<ExecutionStep>()
 
-    /**
-     * Read-only access to environment variables at execution definition time.
-     * Includes both system env vars and extra env vars passed via `-e` CLI args.
-     */
-    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
-
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+    fun job(name: String? = null, description: String? = null, block: suspend JobScope.() -> Unit) {
         val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))
@@ -53,21 +50,14 @@ class ExecutionBuilder(private val name: String, private val description: String
     internal fun build(): Execution = Execution(name, description, steps.toList())
 }
 
-class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $name") {
+class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $name"), Env by EnvImpl() {
     private val steps = mutableListOf<ExecutionStep>()
-
-    /**
-     * Read-only access to environment variables at execution definition time.
-     * Includes both system env vars and extra env vars passed via `-e` CLI args.
-     */
-    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
-
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+    fun job(name: String? = null, description: String? = null, block: suspend JobScope.() -> Unit) {
         val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))
@@ -80,20 +70,14 @@ class SequentialBuilder(val name: String) : Logging by LoggingImpl("Execution $n
     internal fun build(): SequentialSteps = SequentialSteps(steps.toList())
 }
 
-class ParallelBuilder(name: String) : Logging by LoggingImpl("Execution $name") {
+class ParallelBuilder(name: String) : Logging by LoggingImpl("Execution $name"), Env by EnvImpl() {
     private val steps = mutableListOf<ExecutionStep>()
-
-    /**
-     * Read-only access to environment variables at execution definition time.
-     * Includes both system env vars and extra env vars passed via `-e` CLI args.
-     */
-    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
     fun job(job: Job) {
         steps.add(JobExecutionStep(job))
     }
 
-    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit) {
+    fun job(name: String? = null, description: String? = null, block: suspend JobScope.() -> Unit) {
         val builder = JobBuilder(name, description)
         builder.setBlock(block)
         steps.add(JobExecutionStep(builder.build()))

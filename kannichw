@@ -73,8 +73,15 @@ fi
 # Container name for cleanup
 CONTAINER_NAME="kannich-$$"
 
+# Check if running in a terminal for colored output
+TTY_FLAG=""
+if [ -t 1 ]; then
+    TTY_FLAG="-t"
+fi
+
 # Put all environment variables into a file named ".kannich_current_env"
-env > $PROJECT_DIR/.kannich_current_env
+# Use null bytes as delimiters to handle multiline values unambiguously
+awk 'BEGIN { for (name in ENVIRON) printf "%s=%s\0", name, ENVIRON[name] }' > "$PROJECT_DIR/.kannich_current_env"
 
 # Cleanup function
 cleanup() {
@@ -91,6 +98,7 @@ docker run --rm \
     --init \
     --name "$CONTAINER_NAME" \
     --privileged \
+    $TTY_FLAG \
     -v "$PROJECT_DIR:/workspace" \
     -v "$CACHE_MOUNT" \
     $DEV_MODE_MOUNT \

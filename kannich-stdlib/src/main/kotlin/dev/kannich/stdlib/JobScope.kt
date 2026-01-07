@@ -1,18 +1,16 @@
 package dev.kannich.stdlib
 
+import Env
+import EnvImpl
+
 /**
  * Scope available inside job blocks.
  * Provides user-facing DSL for artifacts, logging, error handling, and convenience
  * methods that delegate to the underlying JobContext.
  */
 @KannichDsl
-class JobScope(name: String?): Logging by LoggingImpl("Job${ if (name != null) " $name" else ""}") {
+class JobScope(name: String?) : Logging by LoggingImpl("Job${if (name != null) " $name" else ""}"), Env by EnvImpl() {
     private val artifactSpecs = mutableListOf<ArtifactSpec>()
-
-    /**
-     * Returns the value of an environment variable or null if it is not set.
-     */
-    suspend fun getEnv(name: String): String? = JobContext.current().env[name]
 
     /**
      * Collects artifacts matching the specified patterns.

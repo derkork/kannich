@@ -1,30 +1,27 @@
 package dev.kannich.stdlib
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import Env
+import EnvImpl
+import kotlinx.coroutines.runBlocking
 
 /**
  * Entry point for defining Kannich pipelines.
  */
-fun pipeline(block: PipelineBuilder.() -> Unit): Pipeline {
-    return PipelineBuilder().apply(block).build()
+fun pipeline(block: suspend PipelineBuilder.() -> Unit): Pipeline {
+    val pipelineBuilder = PipelineBuilder()
+    runBlocking {
+        block(pipelineBuilder)
+    }
+    return pipelineBuilder.build()
 }
 
 class Pipeline internal constructor(
-    val jobs: Map<String, Job>,
     val executions: Map<String, Execution>
 )
 
 @KannichDsl
-class PipelineBuilder : Logging by LoggingImpl("Pipeline") {
-    private val jobs = mutableMapOf<String, Job>()
+class PipelineBuilder : Logging by LoggingImpl("Pipeline"), Env by EnvImpl() {
     private val executions = mutableMapOf<String, Execution>()
-
-    /**
-     * Read-only access to environment variables at pipeline definition time.
-     * Includes both system env vars and extra env vars passed via `-e` CLI args.
-     */
-    fun getEnv(name: String): String? = PipelineEnv.getEnv(name)
 
     /**
      * Defines a job with the given name and execution block.
@@ -32,19 +29,28 @@ class PipelineBuilder : Logging by LoggingImpl("Pipeline") {
      *
      * Use `artifacts { }` within the job block to collect build artifacts.
      */
-    fun job(name: String, description: String? = null, block: suspend JobScope.() -> Unit): Job {
+    suspend fun job(
+        name: String? = null,
+        description: String? = null,
+        block: suspend JobScope.() -> Unit
+    ): Job {
         val builder = JobBuilder(name, description)
         builder.setBlock(block)
         val job = builder.build()
-        jobs[name] = job
         return job
     }
 
-    fun execution(name: String, description: String? = null, block: ExecutionBuilder.() -> Unit): Execution {
-        val execution = ExecutionBuilder(name, description).apply(block).build()
+    suspend fun execution(
+        name: String,
+        description: String? = null,
+        block: suspend ExecutionBuilder.() -> Unit
+    ): Execution {
+        val executionBuilder = ExecutionBuilder(name, description)
+        block(executionBuilder)
+        val execution = executionBuilder.build()
         executions[name] = execution
         return execution
     }
 
-    internal fun build(): Pipeline = Pipeline(jobs.toMap(), executions.toMap())
+    internal fun build(): Pipeline = Pipeline(executions.toMap())
 }

@@ -77,7 +77,8 @@ class ExecutionEngine(
         val results = runBlocking {
             steps.map { step ->
                 async(Dispatchers.IO) {
-                    val layerId = LayerManager.createJobLayer(parentLayerId).getOrElse { return@async Result.failure(it) }
+                    val layerId =
+                        LayerManager.createJobLayer(parentLayerId).getOrElse { return@async Result.failure(it) }
                     parallelLayerIds.add(layerId)
 
                     // this is pretty much the same as sequential execution, but we need to pass the layer ID to the child steps
@@ -126,8 +127,8 @@ class ExecutionEngine(
     }
 
     private fun executeJob(job: Job, workDir: String): Result<Unit> {
-        logger.info("Running job: ${job.name}")
-
+        val jobName = if (job.name != null) " ${job.name}"  else  ""
+        logger.info("Running$jobName")
         // Create job context
         val jobCtx = JobContext(
             env = System.getenv() + extraEnv,
@@ -139,7 +140,7 @@ class ExecutionEngine(
         val scope = JobScope(job.name)
         try {
             try {
-                timed("Job ${job.name}") {
+                timed("Job$jobName") {
                     runBlocking(jobCtx) {
                         job.block(scope)
                     }
@@ -163,8 +164,7 @@ class ExecutionEngine(
                     collectArtifacts(spec, Path.of(workDir)).getOrElse { return Result.failure(it) }
                 }
             }
-        }
-        finally {
+        } finally {
             runBlocking(jobCtx) {
                 jobCtx.close()
             }

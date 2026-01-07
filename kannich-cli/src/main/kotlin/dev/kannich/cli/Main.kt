@@ -12,7 +12,6 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.types.enum
 import dev.kannich.core.Version
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
@@ -21,8 +20,6 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.io.path.absolute
 import kotlin.system.exitProcess
 
@@ -59,9 +56,53 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
 
-        // Setup Maven repository symlink (normal mode: cached, dev mode: host .m2)
         setupMavenRepository()
 
+        val finalEnv = buildEnvironment()
+
+        DefaultEnv.env = finalEnv
+
+        // Parse the script
+        logger.info("Loading pipeline from $kannichFile...")
+        val scriptHost = KannichScriptHost()
+        val result = scriptHost.evaluate(scriptFile)
+
+        val pipeline = result.getOrElse { error ->
+            logger.error("Error loading pipeline: ${error.message}")
+            exitProcess(1)
+        }
+
+        if (pipeline !is Pipeline) {
+            logger.error("Script did not return a Pipeline")
+            exitProcess(1)
+        }
+
+        logger.info("Pipeline loaded.")
+
+        if (list) {
+            listPipeline(pipeline)
+            return
+        }
+
+        // Check if requested execution exists
+        if (!pipeline.executions.containsKey(execution)) {
+            logger.error("Execution '$execution' not found")
+            logger.info("Available executions: ${pipeline.executions.keys.joinToString()}")
+            exitProcess(1)
+        }
+
+        // Run the execution
+        logger.info("Running execution: $execution")
+
+        val executionEngine = ExecutionEngine(Path.of(Kannich.WORKSPACE_DIR).absolute(), finalEnv)
+
+        executionEngine.runExecution(pipeline, execution!!).getOrElse {
+            logger.error("Execution failed: ${it.message}")
+            exitProcess(1)
+        }
+    }
+
+    private fun buildEnvironment(): Map<String, String> {
         // Parse -e KEY=VALUE arguments into a map (split at first =)
         // This is done before script evaluation so getEnv() in builders can see these values
         val extraEnv = envVars.mapNotNull { envVar ->
@@ -78,51 +119,8 @@ class KannichCommand : CliktCommand(name = "kannich") {
 
         val hostEnv = determineHostEnvVars()
         val finalEnv = hostEnv + extraEnv
-
-        // Set extra env vars for pipeline definition (see PipelineEnv for why)
-        PipelineEnv.setExtraEnv(finalEnv)
-
-        // Parse the script
-        logger.info("Loading pipeline from $kannichFile...")
-        val scriptHost = KannichScriptHost()
-        val result = scriptHost.evaluate(scriptFile)
-
-        // Clear extra env vars after evaluation
-        PipelineEnv.clear()
-
-        val pipeline = result.getOrElse { error ->
-            logger.error("Error loading pipeline: ${error.message}")
-            exitProcess(1)
-        }
-
-        if (pipeline !is Pipeline) {
-            logger.error("Script did not return a Pipeline")
-            exitProcess(1)
-        }
-
-        logger.info("Pipeline loaded.")
-
-        if (list) {
-            listPipeline(pipeline, execution)
-            return
-        }
-
-        // Check if requested execution exists
-        if (!pipeline.executions.containsKey(execution)) {
-            logger.error("Execution '$execution' not found")
-            logger.info("Available executions: ${pipeline.executions.keys.joinToString()}")
-            exitProcess(1)
-        }
-
-        // Run the execution
-        logger.info("Running execution: $execution")
-
-        val executionEngine = ExecutionEngine(Path.of(Kannich.WORKSPACE_DIR).absolute(), extraEnv)
-
-        executionEngine.runExecution(pipeline, execution!!).getOrElse {
-            logger.error("Execution failed: ${it.message}")
-            exitProcess(1)
-        }
+        logger.debug("Using env vars: ${finalEnv.keys.joinToString(", ")}")
+        return finalEnv
     }
 
     private fun determineHostEnvVars(): Map<String, String> {
@@ -132,7 +130,10 @@ class KannichCommand : CliktCommand(name = "kannich") {
         val hostEnv = mutableMapOf<String, String>()
         logger.debug("Reading current env from $currentEnvFile")
         withFileContentIfFileExists(currentEnvFile) { content ->
-            content.split("\n").forEach { line ->
+            logger.debug("Content: $content")
+            // env entries are separated by \u0000
+            content.split("\u0000").forEach { line ->
+                logger.debug("Line: $line")
                 val idx = line.indexOf('=')
                 if (idx > 0) {
                     hostEnv[line.substring(0, idx).trim()] = line.substring(idx + 1).trim()
@@ -143,6 +144,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // delete the current env file for security reasons
         logger.debug("Deleting $currentEnvFile")
         FsUtil.delete(currentEnvFile).getOrElse { logger.warn("Failed to delete $currentEnvFile: ${it.message}") }
+        logger.debug("Read env vars: ${hostEnv.keys.joinToString(", ")}")
 
         // filter variables, so we only keep the safe ones. look for a .kannichenv file in the
         // workspace. this has prefixes for allowed variables one by line. If that file does not exist use a default
@@ -150,7 +152,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         val defaultPrefixes = listOf("CI_", "GITHUB_", "BUILD_", "CIRCLE_", "TRAVIS_", "BITBUCKET_", "KANNICH_")
         val effectivePrefixes = mutableSetOf<String>()
         val kannichEnvFile = Path.of("${Kannich.WORKSPACE_DIR}/.kannichenv")
-        withFileContentIfFileExists(kannichEnvFile) { content ->
+        val usedKannichEnv = withFileContentIfFileExists(kannichEnvFile) { content ->
             content.split("\n").forEach { line ->
                 if (line.trim() == "<defaults>") {
                     effectivePrefixes.addAll(defaultPrefixes)
@@ -159,21 +161,26 @@ class KannichCommand : CliktCommand(name = "kannich") {
                 }
             }
         }
+        if (!usedKannichEnv) {
+            effectivePrefixes.addAll(defaultPrefixes)
+        }
+        logger.debug("Filtering env vars for prefixes: $effectivePrefixes")
 
         // remove env vars that do not start with one of the prefixes
-        val filteredEnv = hostEnv.filterKeys { key -> effectivePrefixes.any { key.startsWith(it) } }
-        return filteredEnv
+        return hostEnv.filterKeys { key -> effectivePrefixes.any { key.startsWith(it) } }
     }
 
 
-    private fun withFileContentIfFileExists(path: Path, block: (String) -> Unit) {
+    private fun withFileContentIfFileExists(path: Path, block: (String) -> Unit): Boolean {
         if (FsUtil.exists(path).getOrDefault(false)) {
             val content = FsUtil.readAsString(path).getOrElse {
                 logger.error("Failed to read $path: ${it.message}")
                 exitProcess(1)
             }
             block(content)
+            return true
         }
+        return false
     }
 
     private fun setupMavenRepository() {
@@ -216,22 +223,10 @@ class KannichCommand : CliktCommand(name = "kannich") {
         }
     }
 
-    private fun listPipeline(pipeline: Pipeline, targetExecution: String?) {
-        val executionsToList = if (targetExecution != null) {
-            val exec = pipeline.executions[targetExecution]
-            if (exec == null) {
-                logger.error("Execution '$targetExecution' not found")
-                exitProcess(1)
-            }
-            listOf(exec)
-        } else {
-            pipeline.executions.values.toList()
-        }
-
+    private fun listPipeline(pipeline: Pipeline) {
         logger.info("Pipeline contents:")
-        executionsToList.forEach { exec ->
-            val desc = if (!exec.description.isNullOrBlank()) " - ${exec.description}" else ""
-            logger.info("[E] ${exec.name}$desc")
+        pipeline.executions.values.forEach { exec ->
+            printEntity(exec)
             printSteps(exec.steps, "  ")
         }
     }
@@ -241,15 +236,12 @@ class KannichCommand : CliktCommand(name = "kannich") {
             val prefix = if (inParallel) "| - " else "- "
             when (step) {
                 is JobExecutionStep -> {
-                    val job = step.job
-                    val desc = if (!job.description.isNullOrBlank()) " - ${job.description}" else ""
-                    logger.info("$indent$prefix[J] ${job.name}$desc")
+                    printEntity(step.job, indent, prefix)
                 }
 
                 is ExecutionReference -> {
                     val exec = step.execution
-                    val desc = if (!exec.description.isNullOrBlank()) " - ${exec.description}" else ""
-                    logger.info("$indent$prefix[E] ${exec.name}$desc")
+                    printEntity(exec, indent, prefix)
                     printSteps(exec.steps, indent + if (inParallel) "|   " else "  ")
                 }
 
@@ -262,6 +254,17 @@ class KannichCommand : CliktCommand(name = "kannich") {
                 }
             }
         }
+    }
+
+    private fun printEntity(entity: Any, indent: String = "", prefix: String = "") {
+        val (type, name, description) = when (entity) {
+            is Execution -> Triple("Execution", entity.name, entity.description)
+            is Job -> Triple("Job", entity.name, entity.description)
+            else -> throw IllegalArgumentException("Unsupported entity type: ${entity::class.simpleName}")
+        }
+        val namePart = if (name != null) " $name" else ""
+        val descPart = if (!description.isNullOrBlank()) " - $description" else ""
+        logger.info("$indent$prefix$type$namePart$descPart")
     }
 }
 
