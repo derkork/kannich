@@ -29,6 +29,11 @@ object Fs {
     }
 
     /**
+     * Resolves the given path relative to the current working directory and returns it as a Unix-style string.
+     */
+    suspend fun resolve(path: String): String = resolvePath(path).toUnixString()
+
+    /**
      * Creates a temporary directory and returns its path.
      *
      * @param prefix Optional prefix for the temp directory name
