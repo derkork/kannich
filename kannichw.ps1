@@ -70,8 +70,7 @@ if ($DevMode) {
 }
 
 # Pull image if not present
-$null = docker image inspect $KannichImage 2>&1
-if ($LASTEXITCODE -ne 0) {
+if (-not (docker images -q $KannichImage)) {
     Write-Host "Pulling Kannich builder image..."
     docker pull $KannichImage
 }
