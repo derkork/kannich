@@ -1,10 +1,10 @@
-﻿package dev.kannich.stdlib.tools
+﻿package dev.kannich.tools
 
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.util.FsUtil
-import dev.kannich.stdlib.util.FsKind
-import dev.kannich.stdlib.util.toUnixString
+import dev.kannich.stdlib.FsUtil
+import dev.kannich.stdlib.FsKind
+import dev.kannich.stdlib.toUnixString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.InputStream

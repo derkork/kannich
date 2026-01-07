@@ -1,25 +1,15 @@
 #!/bin/sh
 # Kannich Wrapper Script
-# Runs Kannich inside Docker - no local JVM required.
 # Commit this file with your project to enable portable CI builds.
 
 set -e
 
 # Configuration
 KANNICH_IMAGE="${KANNICH_IMAGE:-derkork/kannich:latest}"
-DEFAULT_ENV_PREFIXES="CI_ GITHUB_ BUILD_ CIRCLE_ TRAVIS_ BITBUCKET_ KANNICH_"
 
 # Determine project directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
-
-# Detect --dev-mode / -d flag
-DEV_MODE=0
-for arg in "$@"; do
-    case "$arg" in
-        --dev-mode|-d) DEV_MODE=1; break ;;
-    esac
-done
 
 # Check for Docker
 if ! command -v docker >/dev/null 2>&1; then
@@ -32,8 +22,9 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-# Ensure cache exists
 if [ -n "$KANNICH_CACHE_DIR" ]; then
+    # user may want to supply their own cache dir, they can do so with
+    # a KANNICH_CACHE_DIR variable
     if [ ! -d "$KANNICH_CACHE_DIR" ]; then
         echo "Creating cache directory: $KANNICH_CACHE_DIR"
         mkdir -p "$KANNICH_CACHE_DIR" || {
@@ -43,11 +34,34 @@ if [ -n "$KANNICH_CACHE_DIR" ]; then
     fi
     CACHE_MOUNT="$KANNICH_CACHE_DIR:/kannich/cache"
 else
+    # the default cache is a docker volume
     if ! docker volume inspect kannich-cache >/dev/null 2>&1; then
         echo "Creating docker volume: kannich-cache"
         docker volume create kannich-cache >/dev/null
     fi
     CACHE_MOUNT="kannich-cache:/kannich/cache"
+fi
+
+# Detect --dev-mode / -d flag
+DEV_MODE=0
+for arg in "$@"; do
+    case "$arg" in
+        --dev-mode|-d) DEV_MODE=1; break ;;
+    esac
+done
+
+# Dev mode: mount host .m2/repository
+DEV_MODE_MOUNT=""
+if [ "$DEV_MODE" -eq 1 ]; then
+    HOST_M2_REPO="$HOME/.m2/repository"
+    if [ ! -d "$HOST_M2_REPO" ]; then
+        echo "No local maven repository exists. Creating an empty one."
+        mkdir -p "$HOST_M2_REPO" || {
+          echo "Error: Failed to create local maven repository: $HOST_M2_REPO" >&2
+          exit 1
+        }
+    fi
+    DEV_MODE_MOUNT="-v $HOST_M2_REPO:/kannich/dev-repo"
 fi
 
 # Pull image if not present
@@ -59,96 +73,17 @@ fi
 # Container name for cleanup
 CONTAINER_NAME="kannich-$$"
 
-# Read environment variable prefixes from .kannichenv or use defaults
-ENV_PREFIXES=""
-if [ -f "$PROJECT_DIR/.kannichenv" ]; then
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Strip comments and whitespace
-        line="${line%%#*}"
-        case "$line" in
-            *[!\ ]*) ENV_PREFIXES="$ENV_PREFIXES $line" ;;
-        esac
-    done < "$PROJECT_DIR/.kannichenv"
-else
-    ENV_PREFIXES="$DEFAULT_ENV_PREFIXES"
-fi
-
-# Build environment variable arguments for docker
-ENV_ARGS=""
-for prefix in $ENV_PREFIXES; do
-    for var in $(env | grep "^$prefix" | cut -d= -f1); do
-        ENV_ARGS="$ENV_ARGS -e $var"
-    done
-done
-
-# Always forward all DOCKER_* environment variables
-for var in $(env | grep "^DOCKER_" | cut -d= -f1); do
-    ENV_ARGS="$ENV_ARGS -e $var"
-done
-
-# Determine Docker socket mount
-DOCKER_SOCKET_MOUNT=""
-if [ -n "$DOCKER_HOST" ]; then
-    case "$DOCKER_HOST" in
-        unix://*)
-            DOCKER_SOCKET_PATH="${DOCKER_HOST#unix://}"
-            DOCKER_SOCKET_MOUNT="-v $DOCKER_SOCKET_PATH:$DOCKER_SOCKET_PATH"
-            ;;
-        tcp://*) ;;  # No socket mount needed
-        *) DOCKER_SOCKET_MOUNT="-v /var/run/docker.sock:/var/run/docker.sock" ;;
-    esac
-else
-    DOCKER_SOCKET_MOUNT="-v /var/run/docker.sock:/var/run/docker.sock"
-fi
-
-# Mount DOCKER_CERT_PATH if set
-DOCKER_CERT_MOUNT=""
-if [ -n "$DOCKER_CERT_PATH" ]; then
-    DOCKER_CERT_MOUNT="-v $DOCKER_CERT_PATH:$DOCKER_CERT_PATH"
-fi
-
-# Resolve tcp:// hostname to IP for container use
-DOCKER_HOST_ENV=""
-if [ -n "$DOCKER_HOST" ]; then
-    case "$DOCKER_HOST" in
-        tcp://*)
-            TCP_HOST_PORT="${DOCKER_HOST#tcp://}"
-            TCP_HOST="${TCP_HOST_PORT%%:*}"
-            TCP_PORT="${TCP_HOST_PORT##*:}"
-
-            # Resolve hostname to IP
-            RESOLVED_IP=""
-            if command -v getent >/dev/null 2>&1; then
-                RESOLVED_IP=$(getent hosts "$TCP_HOST" 2>/dev/null | awk '{print $1; exit}')
-            fi
-            if [ -z "$RESOLVED_IP" ]; then
-                RESOLVED_IP=$(ping -c 1 "$TCP_HOST" 2>/dev/null | grep -oE '\([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\)' | head -1 | tr -d '()')
-            fi
-
-            if [ -n "$RESOLVED_IP" ]; then
-                DOCKER_HOST_ENV="-e DOCKER_HOST=tcp://$RESOLVED_IP:$TCP_PORT"
-            fi
-            ;;
-    esac
-fi
+# Put all environment variables into a file named ".kannich_current_env"
+env > $PROJECT_DIR/.kannich_current_env
 
 # Cleanup function
 cleanup() {
     docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
 }
+
+# someone presses CTRL+C, we stop the container to make sure we have no leftovers
 trap cleanup EXIT INT TERM
 
-# Dev mode: mount host .m2/repository
-DEV_MODE_MOUNT=""
-if [ "$DEV_MODE" -eq 1 ]; then
-    HOST_M2_REPO="$HOME/.m2/repository"
-    if [ ! -d "$HOST_M2_REPO" ]; then
-        echo "Error: Dev mode requires ~/.m2/repository to exist." >&2
-        echo "Run 'mkdir -p ~/.m2/repository' or 'mvn install' on a project first."
-        exit 1
-    fi
-    DEV_MODE_MOUNT="-v $HOST_M2_REPO:/kannich/dev-repo"
-fi
 
 # Run Kannich inside Docker
 # shellcheck disable=SC2086
@@ -158,11 +93,7 @@ docker run --rm \
     --privileged \
     -v "$PROJECT_DIR:/workspace" \
     -v "$CACHE_MOUNT" \
-    $DOCKER_SOCKET_MOUNT \
-    $DOCKER_CERT_MOUNT \
     $DEV_MODE_MOUNT \
-    $ENV_ARGS \
-    $DOCKER_HOST_ENV \
     -w /workspace \
     "$KANNICH_IMAGE" \
-    /kannich/jdk/bin/java -jar /kannich/kannich-cli.jar "$@"
+    "$@"

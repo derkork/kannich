@@ -1,7 +1,7 @@
-package dev.kannich.stdlib.tools
+package dev.kannich.tools
 
 import dev.kannich.stdlib.JobContext
-import dev.kannich.stdlib.util.ExecResult
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.secret
 import org.slf4j.LoggerFactory
@@ -20,6 +20,22 @@ import org.slf4j.LoggerFactory
  */
 object Docker {
     private val logger = LoggerFactory.getLogger(Docker::class.java)
+
+    /**
+     * Enables docker support in the container. As starting docker takes a few seconds this is
+     * done only when needed.
+     */
+    suspend fun enable() {
+        val dockerRunning = Shell.execShell("docker info", silent = true).success
+
+        if (dockerRunning) {
+            logger.debug("Docker is already running.")
+            return
+        }
+
+        logger.info("Starting Docker daemon.")
+        Shell.execShell("start-docker.sh", silent = true)
+    }
 
     /**
      * Executes a docker command with the given arguments.

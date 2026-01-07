@@ -24,7 +24,7 @@
         <!-- Stdlib for utilities and context -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-stdlib</artifactId>
+            <artifactId>kannich-tools</artifactId>
         </dependency>
 
         <dependency>

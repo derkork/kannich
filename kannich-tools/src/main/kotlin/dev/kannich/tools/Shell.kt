@@ -1,9 +1,9 @@
-package dev.kannich.stdlib.tools
+package dev.kannich.tools
 
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.util.ExecResult
-import dev.kannich.stdlib.util.ProcessUtil
+import dev.kannich.stdlib.ExecResult
+import dev.kannich.stdlib.ProcessUtil
 
 /**
  * Tool for executing shell commands.

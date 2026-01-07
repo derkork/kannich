@@ -1,7 +1,9 @@
-﻿package dev.kannich.stdlib.tools
+﻿package dev.kannich.tools
 
-import dev.kannich.stdlib.TestBase
-import dev.kannich.stdlib.util.FsKind
+import dev.kannich.stdlib.FsKind
+import dev.kannich.stdlib.JobContext
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -11,7 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class FsTest : TestBase() {
+class FsTest  {
 
     @TempDir
     lateinit var tempDir: Path
@@ -313,6 +315,12 @@ class FsTest : TestBase() {
         val file = File(root, path)
         file.parentFile.mkdirs()
         file.writeText("content")
+    }
+
+    private fun withJobContext(workingDir: String, block: suspend () -> Unit) = runBlocking {
+        withContext(JobContext(workingDir = workingDir)) {
+            block()
+        }
     }
 
 }

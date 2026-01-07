@@ -15,18 +15,16 @@
     <description>Maven plugin for Kannich - Maven build support</description>
 
     <dependencies>
-        <!-- Kotlin -->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
 
-        <!-- Stdlib for Tool interface and context -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-stdlib</artifactId>
+            <artifactId>kannich-tools</artifactId>
         </dependency>
-        <!-- JVM module for Java dependency -->
+
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-java</artifactId>

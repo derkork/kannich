@@ -1,6 +1,5 @@
-﻿package dev.kannich.core.util
+﻿package dev.kannich.stdlib
 
-import dev.kannich.stdlib.util.AntPathMatcher
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

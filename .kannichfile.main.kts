@@ -1,4 +1,5 @@
 @file:DependsOn("dev.kannich:kannich-stdlib:0.2.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.2.0")
 @file:DependsOn("dev.kannich:kannich-maven:0.2.0")
 @file:DependsOn("dev.kannich:kannich-java:0.2.0")
 @file:DependsOn("dev.kannich:kannich-trivy:0.2.0")
@@ -8,7 +9,7 @@
 import dev.kannich.java.Java
 import dev.kannich.maven.Maven
 import dev.kannich.stdlib.*
-import dev.kannich.stdlib.tools.*
+import dev.kannich.tools.*
 import dev.kannich.trivy.Trivy
 import dev.kannich.helm.Helm
 
@@ -110,6 +111,9 @@ pipeline {
             maven.exec("--version")
             trivy.exec("version")
             helm.exec("version")
+
+            Docker.enable()
+            Docker.exec("info")
         }
     }
 }

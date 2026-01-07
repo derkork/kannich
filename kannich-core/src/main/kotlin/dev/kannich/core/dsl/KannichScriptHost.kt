@@ -38,21 +38,6 @@ class KannichScriptHost {
         return extractResult(result)
     }
 
-    /**
-     * Evaluates script content directly (useful for testing).
-     */
-    fun evaluateScript(script: String): Result<Any> {
-        val compilationConfig = createJvmCompilationConfigurationFromTemplate<KannichScript>()
-
-        val result = scriptingHost.eval(
-            script.toScriptSource(),
-            compilationConfig,
-            null
-        )
-
-        return extractResult(result)
-    }
-
     private fun extractResult(result: ResultWithDiagnostics<EvaluationResult>): Result<Any> {
         return when (result) {
             is ResultWithDiagnostics.Success -> {

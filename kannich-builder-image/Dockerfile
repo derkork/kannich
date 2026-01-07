@@ -12,7 +12,7 @@ RUN jlink \
     --output /jdk-minimal
 
 # Stage 2: Final image
-FROM ubuntu:24.04
+FROM cruizba/ubuntu-dind:noble-29.1.3
 
 LABEL org.opencontainers.image.title="Kannich Builder"
 LABEL org.opencontainers.image.description="Base image for Kannich CI builds"
@@ -44,17 +44,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Network tools
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Docker CLI (client only, for interfacing with external Docker daemon)
-RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-29.1.3.tgz -o /tmp/docker.tgz \
-    && tar -xzf /tmp/docker.tgz -C /tmp \
-    && mv /tmp/docker/docker /usr/local/bin/ \
-    && rm -rf /tmp/docker /tmp/docker.tgz \
-    # Install Docker CLI plugins
-    && mkdir -p /usr/local/lib/docker/cli-plugins \
-    && curl -fsSL https://github.com/docker/compose/releases/download/v5.0.1/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose \
-    && curl -fsSL https://github.com/docker/buildx/releases/download/v0.30.1/buildx-v0.30.1.linux-amd64 -o /usr/local/lib/docker/cli-plugins/docker-buildx \
-    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-buildx
 
 # Copy minimal JDK from builder stage (not in global PATH)
 # This allows build pipelines to install their own Java without conflicts

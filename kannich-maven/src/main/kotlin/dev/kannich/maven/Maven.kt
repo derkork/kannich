@@ -4,11 +4,11 @@ import dev.kannich.java.Java
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail
-import dev.kannich.stdlib.tools.Compressor
-import dev.kannich.stdlib.tools.Shell
-import dev.kannich.stdlib.tools.Cache
-import dev.kannich.stdlib.tools.Fs
-import dev.kannich.stdlib.tools.Web
+import dev.kannich.tools.Compressor
+import dev.kannich.tools.Shell
+import dev.kannich.tools.Cache
+import dev.kannich.tools.Fs
+import dev.kannich.tools.Web
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 

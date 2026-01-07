@@ -10,9 +10,9 @@
         <version>0.2.0</version>
     </parent>
 
-    <artifactId>kannich-java</artifactId>
-    <name>Kannich JVM Plugin</name>
-    <description>JVM plugin for Kannich - Java/Kotlin SDK management</description>
+    <artifactId>kannich-tools</artifactId>
+    <name>Kannich Tools</name>
+    <description>Built-in tools for Kannich scripting.</description>
 
     <dependencies>
         <dependency>
@@ -22,7 +22,7 @@
 
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-tools</artifactId>
+            <artifactId>kannich-stdlib</artifactId>
         </dependency>
 
         <dependency>

@@ -35,13 +35,14 @@
     </scm>
 
     <modules>
-        <module>kannich-stdlib</module>
-        <module>kannich-core</module>
         <module>kannich-cli</module>
+        <module>kannich-core</module>
+        <module>kannich-helm</module>
         <module>kannich-java</module>
         <module>kannich-maven</module>
+        <module>kannich-stdlib</module>
+        <module>kannich-tools</module>
         <module>kannich-trivy</module>
-        <module>kannich-helm</module>
     </modules>
 
     <properties>
@@ -156,32 +157,17 @@
             </dependency>
             <dependency>
                 <groupId>dev.kannich</groupId>
-                <artifactId>kannich-stdlib</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.kannich</groupId>
                 <artifactId>kannich-java</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>dev.kannich</groupId>
-                <artifactId>kannich-maven</artifactId>
+                <artifactId>kannich-stdlib</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>dev.kannich</groupId>
-                <artifactId>kannich-gpg</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.kannich</groupId>
-                <artifactId>kannich-trivy</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.kannich</groupId>
-                <artifactId>kannich-helm</artifactId>
+                <artifactId>kannich-tools</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

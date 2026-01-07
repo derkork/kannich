@@ -1,4 +1,4 @@
-package dev.kannich.stdlib.tools
+package dev.kannich.tools
 
 import dev.kannich.stdlib.fail
 import org.slf4j.LoggerFactory

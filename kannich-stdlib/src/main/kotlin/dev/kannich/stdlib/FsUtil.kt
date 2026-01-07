@@ -1,4 +1,4 @@
-﻿package dev.kannich.stdlib.util
+﻿package dev.kannich.stdlib
 
 import org.slf4j.LoggerFactory
 import java.io.IOException

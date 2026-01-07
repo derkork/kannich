@@ -13,7 +13,7 @@ import dev.kannich.stdlib.SequentialSteps
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.On
 import dev.kannich.stdlib.timed
-import dev.kannich.stdlib.util.FsUtil
+import dev.kannich.stdlib.FsUtil
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.nio.file.Path

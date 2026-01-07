@@ -1,6 +1,5 @@
-﻿package dev.kannich.stdlib.util
+﻿package dev.kannich.stdlib
 
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir

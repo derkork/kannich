@@ -1,7 +1,6 @@
-package dev.kannich.stdlib.tools
+package dev.kannich.tools
 
 import dev.kannich.stdlib.Kannich
-import dev.kannich.stdlib.fail
 
 /**
  * Built-in tool for managing the Kannich cache.
