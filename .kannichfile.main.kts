@@ -106,7 +106,11 @@ pipeline {
             helm.exec("version")
 
             Docker.enable()
-            Docker.exec("info")
+            // try if we can run docker with a mount in the current work dir.
+            Fs.write("test.txt", "Hello world!")
+            val currentFolder = Fs.resolve("")
+            Docker.exec("run", "-v", "$currentFolder:/data", "alpine", "cat", "/data/test.txt")
+
         }
     }
 }
