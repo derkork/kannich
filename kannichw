@@ -81,7 +81,7 @@ fi
 
 # Put all environment variables into a file named ".kannich_current_env"
 # Use null bytes as delimiters to handle multiline values unambiguously
-awk 'BEGIN { for (name in ENVIRON) printf "%s=%s\0", name, ENVIRON[name] }' > "$PROJECT_DIR/.kannich_current_env"
+awk 'BEGIN { for (name in ENVIRON) printf "%s=%s%c", name, ENVIRON[name], 0 }' > "$PROJECT_DIR/.kannich_current_env"
 
 # Cleanup function
 cleanup() {
