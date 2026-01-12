@@ -248,7 +248,7 @@ object Apt {
     /**
      * Parses apt-cache show output to extract package metadata.
      */
-    private fun parsePackageShow(output: String, requestedName: String): ResolvedPackage {
+    internal fun parsePackageShow(output: String, requestedName: String): ResolvedPackage {
         var name: String? = null
         var version: String? = null
         var architecture: String? = null
@@ -358,7 +358,7 @@ object Apt {
 
         // Install all .deb files at once for proper dependency ordering
         val debList = debPaths.joinToString(" ") { "'$it'" }
-        val result = Shell.execShell("sudo dpkg -i $debList 2>&1")
+        val result = Shell.execShell("dpkg -i $debList 2>&1")
 
         if (!result.success) {
             // dpkg may fail due to missing dependencies - try to fix
@@ -372,7 +372,7 @@ object Apt {
      */
     private suspend fun update() {
         logger.info("Updating APT package lists")
-        val result = Shell.execShell("sudo apt-get update")
+        val result = Shell.execShell("apt-get update")
         if (!result.success) {
             fail("Failed to update APT package lists: ${result.stderr}")
         }
@@ -382,7 +382,7 @@ object Apt {
      * Fixes broken package dependencies.
      */
     private suspend fun fixBrokenDependencies() {
-        val result = Shell.execShell("sudo apt-get --fix-broken install -y 2>&1")
+        val result = Shell.execShell("apt-get --fix-broken install -y 2>&1")
         if (!result.success) {
             fail("Failed to fix broken dependencies: ${result.stderr}")
         }

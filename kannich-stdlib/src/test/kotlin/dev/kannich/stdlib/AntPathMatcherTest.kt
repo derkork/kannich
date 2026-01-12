@@ -1,105 +1,92 @@
-﻿package dev.kannich.stdlib
+package dev.kannich.stdlib
 
-import org.junit.jupiter.api.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 
-class AntPathMatcherTest {
+class AntPathMatcherTest : FunSpec({
 
-    @Test
-    fun `single star matches characters except slash`() {
-        assertTrue(AntPathMatcher.matches("*.jar", "foo.jar"))
-        assertTrue(AntPathMatcher.matches("*.jar", "bar.jar"))
-        assertTrue(AntPathMatcher.matches("*.jar", ".jar"))
-        assertFalse(AntPathMatcher.matches("*.jar", "foo/bar.jar"))
-        assertFalse(AntPathMatcher.matches("*.jar", "foo.txt"))
+    test("single star matches characters except slash") {
+        AntPathMatcher.matches("*.jar", "foo.jar") shouldBe true
+        AntPathMatcher.matches("*.jar", "bar.jar") shouldBe true
+        AntPathMatcher.matches("*.jar", ".jar") shouldBe true
+        AntPathMatcher.matches("*.jar", "foo/bar.jar") shouldBe false
+        AntPathMatcher.matches("*.jar", "foo.txt") shouldBe false
     }
 
-    @Test
-    fun `double star matches characters including slash`() {
-        assertTrue(AntPathMatcher.matches("**.jar", "foo.jar"))
-        assertTrue(AntPathMatcher.matches("**.jar", "foo/bar.jar"))
-        assertTrue(AntPathMatcher.matches("**.jar", "foo/bar/baz.jar"))
-        assertFalse(AntPathMatcher.matches("**.jar", "foo.txt"))
+    test("double star matches characters including slash") {
+        AntPathMatcher.matches("**.jar", "foo.jar") shouldBe true
+        AntPathMatcher.matches("**.jar", "foo/bar.jar") shouldBe true
+        AntPathMatcher.matches("**.jar", "foo/bar/baz.jar") shouldBe true
+        AntPathMatcher.matches("**.jar", "foo.txt") shouldBe false
     }
 
-    @Test
-    fun `question mark matches exactly one character`() {
-        assertTrue(AntPathMatcher.matches("foo?.txt", "foo1.txt"))
-        assertTrue(AntPathMatcher.matches("foo?.txt", "fooa.txt"))
-        assertFalse(AntPathMatcher.matches("foo?.txt", "foo.txt"))
-        assertFalse(AntPathMatcher.matches("foo?.txt", "foo12.txt"))
-        assertFalse(AntPathMatcher.matches("foo?.txt", "foo/.txt"))
+    test("question mark matches exactly one character") {
+        AntPathMatcher.matches("foo?.txt", "foo1.txt") shouldBe true
+        AntPathMatcher.matches("foo?.txt", "fooa.txt") shouldBe true
+        AntPathMatcher.matches("foo?.txt", "foo.txt") shouldBe false
+        AntPathMatcher.matches("foo?.txt", "foo12.txt") shouldBe false
+        AntPathMatcher.matches("foo?.txt", "foo/.txt") shouldBe false
     }
 
-    @Test
-    fun `double star in path matches directories`() {
+    test("double star in path matches directories") {
         val pattern = "target/**classes"
-        assertTrue(AntPathMatcher.matches(pattern, "target/classes"))
-        assertTrue(AntPathMatcher.matches(pattern, "target/foo/classes"))
-        assertTrue(AntPathMatcher.matches(pattern, "target/foo/bar/classes"))
-        assertFalse(AntPathMatcher.matches(pattern, "src/classes"))
+        AntPathMatcher.matches(pattern, "target/classes") shouldBe true
+        AntPathMatcher.matches(pattern, "target/foo/classes") shouldBe true
+        AntPathMatcher.matches(pattern, "target/foo/bar/classes") shouldBe true
+        AntPathMatcher.matches(pattern, "src/classes") shouldBe false
     }
 
-    @Test
-    fun `typical maven artifact pattern`() {
+    test("typical maven artifact pattern") {
         val pattern = "**target/*.jar"
-        assertTrue(AntPathMatcher.matches(pattern, "target/foo.jar"))
-        assertTrue(AntPathMatcher.matches(pattern, "module/target/foo.jar"))
-        assertTrue(AntPathMatcher.matches(pattern, "a/b/target/app.jar"))
-        assertTrue(AntPathMatcher.matches(pattern, "src/target/foo.jar")) // ** matches any prefix
-        assertFalse(AntPathMatcher.matches(pattern, "target/classes/Foo.class"))
+        AntPathMatcher.matches(pattern, "target/foo.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "module/target/foo.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "a/b/target/app.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "src/target/foo.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "target/classes/Foo.class") shouldBe false
     }
 
-    @Test
-    fun `surefire reports pattern`() {
+    test("surefire reports pattern") {
         val pattern = "**target/surefire-reports/**"
-        assertTrue(AntPathMatcher.matches(pattern, "target/surefire-reports/TEST-foo.xml"))
-        assertTrue(AntPathMatcher.matches(pattern, "module/target/surefire-reports/TEST-foo.xml"))
-        assertTrue(AntPathMatcher.matches(pattern, "target/surefire-reports/foo/bar.txt"))
-        assertFalse(AntPathMatcher.matches(pattern, "target/failsafe-reports/TEST-foo.xml"))
+        AntPathMatcher.matches(pattern, "target/surefire-reports/TEST-foo.xml") shouldBe true
+        AntPathMatcher.matches(pattern, "module/target/surefire-reports/TEST-foo.xml") shouldBe true
+        AntPathMatcher.matches(pattern, "target/surefire-reports/foo/bar.txt") shouldBe true
+        AntPathMatcher.matches(pattern, "target/failsafe-reports/TEST-foo.xml") shouldBe false
     }
 
-    @Test
-    fun `exclude sources jar pattern`() {
+    test("exclude sources jar pattern") {
         val pattern = "**target/*-sources.jar"
-        assertTrue(AntPathMatcher.matches(pattern, "target/foo-sources.jar"))
-        assertTrue(AntPathMatcher.matches(pattern, "module/target/bar-sources.jar"))
-        assertFalse(AntPathMatcher.matches(pattern, "target/foo.jar"))
-        assertFalse(AntPathMatcher.matches(pattern, "target/sources.jar"))
+        AntPathMatcher.matches(pattern, "target/foo-sources.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "module/target/bar-sources.jar") shouldBe true
+        AntPathMatcher.matches(pattern, "target/foo.jar") shouldBe false
+        AntPathMatcher.matches(pattern, "target/sources.jar") shouldBe false
     }
 
-    @Test
-    fun `no implicit directory shorthand`() {
-        // Pattern ending in / does NOT automatically match subdirectories
+    test("no implicit directory shorthand") {
         val pattern = "target/"
-        assertFalse(AntPathMatcher.matches(pattern, "target/foo.jar"))
-        assertTrue(AntPathMatcher.matches(pattern, "target/"))
+        AntPathMatcher.matches(pattern, "target/foo.jar") shouldBe false
+        AntPathMatcher.matches(pattern, "target/") shouldBe true
     }
 
-    @Test
-    fun `matchesAny returns true if any pattern matches`() {
+    test("matchesAny returns true if any pattern matches") {
         val patterns = listOf("*.txt", "*.jar")
-        assertTrue(AntPathMatcher.matchesAny(patterns, "foo.txt"))
-        assertTrue(AntPathMatcher.matchesAny(patterns, "bar.jar"))
-        assertFalse(AntPathMatcher.matchesAny(patterns, "baz.xml"))
+        AntPathMatcher.matchesAny(patterns, "foo.txt") shouldBe true
+        AntPathMatcher.matchesAny(patterns, "bar.jar") shouldBe true
+        AntPathMatcher.matchesAny(patterns, "baz.xml") shouldBe false
     }
 
-    @Test
-    fun `regex special characters are escaped`() {
-        assertTrue(AntPathMatcher.matches("foo.txt", "foo.txt"))
-        assertFalse(AntPathMatcher.matches("foo.txt", "fooXtxt"))
-        assertTrue(AntPathMatcher.matches("foo[1].txt", "foo[1].txt"))
-        assertFalse(AntPathMatcher.matches("foo[1].txt", "foo1.txt"))
+    test("regex special characters are escaped") {
+        AntPathMatcher.matches("foo.txt", "foo.txt") shouldBe true
+        AntPathMatcher.matches("foo.txt", "fooXtxt") shouldBe false
+        AntPathMatcher.matches("foo[1].txt", "foo[1].txt") shouldBe true
+        AntPathMatcher.matches("foo[1].txt", "foo1.txt") shouldBe false
     }
 
-    @Test
-    fun `complex patterns with multiple wildcards`() {
+    test("complex patterns with multiple wildcards") {
         val pattern = "src/**test/*Test.java"
-        assertTrue(AntPathMatcher.matches(pattern, "src/test/FooTest.java"))
-        assertTrue(AntPathMatcher.matches(pattern, "src/main/test/BarTest.java"))
-        assertTrue(AntPathMatcher.matches(pattern, "src/a/b/c/test/BazTest.java"))
-        assertFalse(AntPathMatcher.matches(pattern, "src/test/Foo.java"))
-        assertFalse(AntPathMatcher.matches(pattern, "test/FooTest.java"))
+        AntPathMatcher.matches(pattern, "src/test/FooTest.java") shouldBe true
+        AntPathMatcher.matches(pattern, "src/main/test/BarTest.java") shouldBe true
+        AntPathMatcher.matches(pattern, "src/a/b/c/test/BazTest.java") shouldBe true
+        AntPathMatcher.matches(pattern, "src/test/Foo.java") shouldBe false
+        AntPathMatcher.matches(pattern, "test/FooTest.java") shouldBe false
     }
-}
+})
