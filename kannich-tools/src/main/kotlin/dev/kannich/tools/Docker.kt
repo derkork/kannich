@@ -2,9 +2,11 @@ package dev.kannich.tools
 
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.ExecResult
+import dev.kannich.stdlib.FsUtil
 import dev.kannich.stdlib.fail
 import dev.kannich.stdlib.secret
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 /**
  * Tool for executing Docker commands.
@@ -13,24 +15,57 @@ import org.slf4j.LoggerFactory
  * Usage in job blocks:
  * ```kotlin
  * job("Build Image") {
- *     docker.exec("build", "-t", "myapp:latest", ".")
- *     docker.exec("push", "myapp:latest")
+ *     Docker.enable()
+ *     Docker.exec("build", "-t", "myapp:latest", ".")
+ *     Docker.exec("push", "myapp:latest")
  * }
  * ```
  */
 object Docker {
     private val logger = LoggerFactory.getLogger(Docker::class.java)
 
+    suspend fun isEnabled(): Boolean = Shell.execShell("docker info", silent = true).success
+
     /**
      * Enables docker support in the container. As starting docker takes a few seconds this is
      * done only when needed.
      */
-    suspend fun enable() {
-        val dockerRunning = Shell.execShell("docker info", silent = true).success
+    suspend fun enable(daemonJson:String = "") {
+        val dockerRunning = isEnabled()
 
-        if (dockerRunning) {
-            logger.debug("Docker is already running.")
-            return
+        val daemonJsonContent = FsUtil.readAsString(Path.of("/etc/docker/daemon.json")).getOrElse {""}
+        if (daemonJsonContent != daemonJson) {
+            if (dockerRunning) {
+                val result = Shell.execShell("supervisorctl stop dockerd", silent = true)
+                if (!result.success) {
+                    fail("Failed to stop Docker daemon: ${result.stderr}")
+                }
+            }
+
+            if (daemonJson.isBlank()) {
+                logger.info("Removing daemon.json.")
+                FsUtil.delete(Path.of("/etc/docker/daemon.json")).getOrElse {
+                    fail("Failed to delete daemon.json")
+                }
+            }
+            else {
+                logger.info("Updating daemon.json.")
+                FsUtil.write(Path.of("/etc/docker/daemon.json"), daemonJson).getOrElse {
+                    fail("Failed to write daemon.json")
+                }
+            }
+
+            if (dockerRunning) {
+                val result = Shell.execShell("supervisorctl start dockerd", silent = true)
+                if (!result.success) {
+                    fail("Failed to start Docker daemon: ${result.stderr}")
+                }
+            }
+        } else {
+            if (dockerRunning) {
+                logger.debug("Docker is already running.")
+                return
+            }
         }
 
         logger.info("Starting Docker daemon.")
@@ -47,7 +82,9 @@ object Docker {
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
     suspend fun exec(vararg args: String, silent: Boolean = false): ExecResult {
-        enable()
+        if (!isEnabled())  {
+            fail("Docker is not enabled. Please enable it by calling Docker.enable().")
+        }
         val result = Shell.exec("docker", *args, silent = silent)
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
@@ -68,7 +105,9 @@ object Docker {
      */
     suspend fun login(username: String, password: String, registry: String? = null): ExecResult {
         secret(password)
-        enable()
+        if (!isEnabled())  {
+            fail("Docker is not enabled. Please enable it by calling Docker.enable().")
+        }
         logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")
         val registryArg = registry ?: ""
         val result = JobContext.current().withEnv(mapOf("DOCKER_PASSWORD" to password)) {
