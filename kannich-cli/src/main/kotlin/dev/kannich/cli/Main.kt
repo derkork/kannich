@@ -153,11 +153,12 @@ class KannichCommand : CliktCommand(name = "kannich") {
         val effectivePrefixes = mutableSetOf<String>()
         val kannichEnvFile = Path.of("${Kannich.WORKSPACE_DIR}/.kannichenv")
         val usedKannichEnv = withFileContentIfFileExists(kannichEnvFile) { content ->
-            content.split("\n").forEach { line ->
-                if (line.trim() == "<defaults>") {
-                    effectivePrefixes.addAll(defaultPrefixes)
-                } else {
-                    effectivePrefixes.add(line.trim())
+            content.lines().forEach { line ->
+                // remove comments (anything following a #)
+                when(val lineWithoutComments = line.substringBefore("#").trim()) {
+                   "!defaults" -> effectivePrefixes.addAll(defaultPrefixes)
+                   "" -> return@forEach
+                   else -> effectivePrefixes.add(lineWithoutComments)
                 }
             }
         }
