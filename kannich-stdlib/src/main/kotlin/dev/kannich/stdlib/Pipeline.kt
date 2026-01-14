@@ -1,7 +1,5 @@
 package dev.kannich.stdlib
 
-import Env
-import EnvImpl
 import kotlinx.coroutines.runBlocking
 
 /**

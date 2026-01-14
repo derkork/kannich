@@ -1,16 +1,23 @@
-﻿import dev.kannich.stdlib.JobContext
-import dev.kannich.stdlib.fail
+﻿package dev.kannich.stdlib
 
 interface Env {
     suspend fun getEnv(name: String): String?
     suspend fun requireEnv(name: String): String =
         getEnv(name) ?: fail("Please specify $name in environment variables.")
 
+    suspend fun getEnvFlag(name: String): Boolean? = getEnv(name)?.toBoolean()
+    suspend fun requireEnvFlag(name: String): Boolean =
+        getEnvFlag(name) ?: fail("Please specify $name in environment variables.")
+
+    suspend fun getEnvInt(name: String): Int? = getEnv(name)?.toIntOrNull()
+    suspend fun requireEnvInt(name: String): Int =
+        getEnvInt(name) ?: fail("Please specify $name in environment variables.")
+
     suspend fun hasEnv(name: String): Boolean = getEnv(name) != null
 }
 
 
-class EnvImpl() : Env {
+class EnvImpl : Env {
     /**
      * Return the environment variable from the most appropriate execution context.
      */
