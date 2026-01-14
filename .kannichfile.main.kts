@@ -1,9 +1,9 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.3.0")
-@file:DependsOn("dev.kannich:kannich-tools:0.3.0")
-@file:DependsOn("dev.kannich:kannich-maven:0.3.0")
-@file:DependsOn("dev.kannich:kannich-java:0.3.0")
-@file:DependsOn("dev.kannich:kannich-trivy:0.3.0")
-@file:DependsOn("dev.kannich:kannich-helm:0.3.0")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.4.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.4.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.4.0")
+@file:DependsOn("dev.kannich:kannich-java:0.4.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.4.0")
+@file:DependsOn("dev.kannich:kannich-helm:0.4.0")
 
 
 import dev.kannich.java.Java
@@ -90,11 +90,23 @@ pipeline {
         }
     }
 
+    execution("update-version") {
+        job {
+            val maven = Maven("3.9.6", java)
+            val newVersion = requireEnv("KANNICH_VERSION")
+            maven.exec( "-B", "versions:set", "-DnewVersion=$newVersion", "-DgenerateBackupPoms=false")
+            artifacts {
+                includes("**pom.xml")
+            }
+        }
+    }
+
     execution("clear-cache", "Clears the Kannich cache.") {
         job {
             Cache.clear()
         }
     }
+
 
     execution("smoke-test", "Runs a set of smoke tests to verify things work in general.") {
         job {
