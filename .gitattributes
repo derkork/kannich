@@ -1,0 +1,7 @@
+# Auto-detect text files and force LF on checkout
+* text=auto eol=lf
+
+# Force CRLF for Windows-native files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

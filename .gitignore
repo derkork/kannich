@@ -42,3 +42,4 @@ kannich-builder-image/m2-repo/*
 ### Other stuff
 test_*.ps1
 *.key
+release.sh
