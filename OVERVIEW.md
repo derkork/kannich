@@ -147,7 +147,21 @@ kannich/
 ├── kannich-docker/         # Docker-in-Docker plugin
 ├── kannich-builder-image/  # Custom builder Docker image
 ├── kannichw                # End-user wrapper (Unix) - committed with user projects
-├── kannichw.bat            # End-user wrapper (Windows)
+├── kannichw.ps1            # End-user wrapper (Windows)
+```
+
+### Line Endings
+
+This project uses `.gitattributes` to automatically manage line endings. 
+- Most files (including Kotlin, XML, and Shell scripts) are forced to **LF** on checkout.
+- Windows-specific files (`.ps1`, `.bat`, `.cmd`) are forced to **CRLF** on checkout.
+
+This ensures that crucial files (like `kannichw` and shell scripts inside Docker) always have the correct line endings regardless of your global `core.autocrlf` setting.
+
+If you are an existing user on Windows and see "modified" files due to line endings, you can refresh your working tree with:
+```bash
+git add --renormalize .
+git reset --hard HEAD
 ```
 
 ### Code Style
