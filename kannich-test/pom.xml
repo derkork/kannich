@@ -7,7 +7,8 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.3.0</version>
+        <version>0.4.0</version>
+        <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-test</artifactId>

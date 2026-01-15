@@ -8,9 +8,11 @@
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
         <version>0.4.0</version>
+        <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-java</artifactId>
+    <version>1.0.0</version>
     <name>Kannich JVM Plugin</name>
     <description>JVM plugin for Kannich - Java/Kotlin SDK management</description>
 
@@ -34,10 +36,12 @@
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-runner-junit5-jvm</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>dev.kannich</groupId>
@@ -45,15 +49,6 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
 
     <profiles>
         <profile>

@@ -8,6 +8,7 @@
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
         <version>0.4.0</version>
+        <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-tools</artifactId>
@@ -45,15 +46,6 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
 
     <profiles>
         <profile>

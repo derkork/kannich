@@ -8,11 +8,18 @@
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
         <version>0.4.0</version>
+        <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-maven</artifactId>
+    <version>1.0.0</version>
     <name>Kannich Maven Plugin</name>
     <description>Maven plugin for Kannich - Maven build support</description>
+
+    <properties>
+        <!-- Version of kannich-java this extension depends on -->
+        <kannich-java.version>1.0.0</kannich-java.version>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -25,9 +32,11 @@
             <artifactId>kannich-tools</artifactId>
         </dependency>
 
+        <!-- Inter-extension dependency: explicit version required -->
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-java</artifactId>
+            <version>${kannich-java.version}</version>
         </dependency>
 
         <dependency>
@@ -39,10 +48,18 @@
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-runner-junit5-jvm</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

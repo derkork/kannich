@@ -7,7 +7,6 @@ import org.testcontainers.containers.BindMode
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.containers.wait.strategy.Wait
-import java.nio.file.Files
 import java.nio.file.Path
 
 object KannichTestContainer {
@@ -40,7 +39,7 @@ object KannichTestContainer {
         logger.info("Mounting local Maven repository: $M2_REPOSITORY")
         val container = GenericContainer(image)
             .withPrivilegedMode(true)
-            .withFileSystemBind(M2_REPOSITORY, "/kannich/cache/kannich-deps", BindMode.READ_ONLY)
+            .withFileSystemBind(M2_REPOSITORY, "/kannich/cache/kannich-deps", BindMode.READ_WRITE)
             .withCreateContainerCmdModifier { cmd ->
                 cmd.withEntrypoint("bash", "-c")
                 cmd.withCmd("exec sleep infinity")
@@ -78,18 +77,4 @@ object KannichTestContainer {
         return ContainerExtension(container, lifecycleMode)
     }
 
-    /**
-     * Creates a kannich container with a temporary directory mounted.
-     * Automatically mounts the local Maven repository for access to locally installed artifacts.
-     */
-    fun createWithTempMount(
-        prefix: String = "kannich-test",
-        image: String = DEFAULT_IMAGE,
-        lifecycleMode: ContainerLifecycleMode = ContainerLifecycleMode.Spec,
-        setup: (Path) -> Unit = {}
-    ): Pair<ContainerExtension<GenericContainer<*>>, Path> {
-        val tempDir = Files.createTempDirectory(prefix)
-        setup(tempDir)
-        return createWithMount(tempDir, image, lifecycleMode) to tempDir
-    }
 }

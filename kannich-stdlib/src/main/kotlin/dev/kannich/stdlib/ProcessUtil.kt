@@ -76,6 +76,7 @@ private class StreamGobbler(val inputStream: InputStream, val onLine: (String) -
             while (true) {
                 val line = br.readLine() ?: break
                 writer.write(line)
+                writer.write("\n")
                 onLine(line)
             }
         } catch (e: Exception) {
