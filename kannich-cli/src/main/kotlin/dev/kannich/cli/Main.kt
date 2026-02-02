@@ -15,6 +15,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import dev.kannich.core.Version
 import dev.kannich.core.dsl.KannichScriptHost
 import dev.kannich.core.execution.ExecutionEngine
+import dev.kannich.core.proxy.ProxyConfiguration
 import dev.kannich.stdlib.*
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -61,6 +62,9 @@ class KannichCommand : CliktCommand(name = "kannich") {
         val finalEnv = buildEnvironment()
 
         DefaultEnv.env = finalEnv
+
+        // Configure proxy for Maven dependency resolution
+        ProxyConfiguration.configureFromEnvironment(finalEnv)
 
         // Parse the script
         logger.info("Loading pipeline from $kannichFile...")

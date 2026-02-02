@@ -150,6 +150,39 @@ kannich/
 ├── kannichw.ps1            # End-user wrapper (Windows)
 ```
 
+### Module Dependencies
+
+```mermaid
+graph TD
+    stdlib[kannich-stdlib]
+    tools[kannich-tools]
+    core[kannich-core]
+    cli[kannich-cli]
+    test[kannich-test]
+    java[kannich-java]
+    maven[kannich-maven]
+    trivy[kannich-trivy]
+    helm[kannich-helm]
+
+    tools --> stdlib
+    core --> stdlib
+    cli --> core
+    cli --> stdlib
+    java --> tools
+    maven --> tools
+    maven --> java
+    trivy --> tools
+    helm --> tools
+
+    tools -.-> test
+    java -.-> test
+    maven -.-> test
+```
+
+**Legend:**
+- Solid lines: compile dependencies
+- Dotted lines: test dependencies
+
 ### Line Endings
 
 This project uses `.gitattributes` to automatically manage line endings. 
@@ -193,6 +226,19 @@ mvn -Pbootstrap install
 **For projects using Kannich** (requires only Docker):
 ```bash
 ./kannichw build  # runs inside Docker, no local JVM needed
+```
+
+### Running Tests
+
+```bash
+# Unit tests only
+mvn test
+
+# Integration tests only (requires all modules to be installed first)
+mvn install -DskipTests && mvn verify -Pintegration-tests -Dsurefire.skip=true
+
+# All tests (unit + integration, requires all modules to be installed first)
+mvn install -DskipTests && mvn verify -Pintegration-tests
 ```
 
 ### Key Technical Decisions

@@ -119,6 +119,7 @@ class ContainerExecutor(private val container: GenericContainer<*>) {
             "/kannich/jdk/bin/java",
             "-jar",
             "/kannich/kannich-cli.jar",
+            "-v",
             execution
         ) + extraArgs.toList()
         return exec(*args.toTypedArray())

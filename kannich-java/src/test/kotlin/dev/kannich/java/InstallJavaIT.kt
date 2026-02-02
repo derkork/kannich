@@ -19,6 +19,9 @@ class InstallJavaIT : FunSpec({
             .import("dev.kannich.java.Java")
             .job {
                 """
+                Shell.exec("env")
+                Shell.exec("curl", "-v", "-x", "http://squid-proxy:3128", "http://example.com")
+
                 val java = Java("21")
                 java.exec("--version")
                 """

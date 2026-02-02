@@ -18,6 +18,8 @@ class AptIT : FunSpec({
             """Apt.install("tree")"""
         }
 
+        println(pipeline.build())
+
         val result = executor.run(pipeline)
         result.success shouldBe true
 
