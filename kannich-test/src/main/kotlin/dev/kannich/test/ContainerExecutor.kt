@@ -104,9 +104,7 @@ class ContainerExecutor(private val container: GenericContainer<*>) {
      * @param execution The execution name to run (default: "test")
      */
     fun run(pipeline: PipelineBuilder, execution: String = "test"): ContainerExecResult {
-        val content = pipeline.build()
-        logger.info("Generated kannichfile: $content")
-        writeFile(KANNICH_FILE_PATH, content)
+        writeFile(KANNICH_FILE_PATH, pipeline.build())
         return runKannich(execution)
     }
 
