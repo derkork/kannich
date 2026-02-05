@@ -7,11 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
         <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-stdlib</artifactId>
+    <version>${kannich.core.version}</version>
     <name>Kannich Standard Library</name>
     <description>Standard library DSL for Kannich pipelines (pipeline, job, execution)</description>
 

@@ -17,7 +17,7 @@
         <module>kannich-parent</module>
         <module>kannich-stdlib</module>
         <module>kannich-tools</module>
-        <module>kannich-core</module>
+        <module>kannich-runtime</module>
         <module>kannich-cli</module>
         <module>kannich-test</module>
         <module>kannich-java</module>

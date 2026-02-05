@@ -1,7 +1,7 @@
 package dev.kannich.java
 
 import dev.kannich.test.ContainerExecutor
-import dev.kannich.test.KannichTestContainer
+import dev.kannich.test.KannichTestSpecExtension
 import dev.kannich.test.PipelineBuilder
 import io.kotest.core.extensions.install
 import io.kotest.core.spec.style.FunSpec
@@ -9,7 +9,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 
 class InstallJavaIT : FunSpec({
-    val container = install(KannichTestContainer.create())
+    val container = install(KannichTestSpecExtension())
 
     test("Java module installs Java 21 and runs java --version") {
         val executor = ContainerExecutor(container)
@@ -19,9 +19,6 @@ class InstallJavaIT : FunSpec({
             .import("dev.kannich.java.Java")
             .job {
                 """
-                Shell.exec("env")
-                Shell.exec("curl", "-v", "-x", "http://squid-proxy:3128", "http://example.com")
-
                 val java = Java("21")
                 java.exec("--version")
                 """

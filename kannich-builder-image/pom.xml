@@ -7,10 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
+        <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-builder-image</artifactId>
+    <version>0.5.0-${kannich.core.version}</version>
     <packaging>pom</packaging>
 
     <name>Kannich Builder Image</name>
@@ -52,7 +54,7 @@
                                 <artifactItem>
                                     <groupId>dev.kannich</groupId>
                                     <artifactId>kannich-cli</artifactId>
-                                    <version>${project.version}</version>
+                                    <version>${kannich.core.version}</version>
                                     <type>jar</type>
                                     <destFileName>kannich-cli.jar</destFileName>
                                 </artifactItem>

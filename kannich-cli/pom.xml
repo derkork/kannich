@@ -7,11 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
         <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-cli</artifactId>
+    <version>${kannich.core.version}</version>
     <name>Kannich CLI</name>
     <description>Command-line interface for Kannich</description>
 
@@ -25,7 +26,7 @@
         <!-- Internal modules -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-core</artifactId>
+            <artifactId>kannich-runtime</artifactId>
         </dependency>
         <dependency>
             <groupId>dev.kannich</groupId>

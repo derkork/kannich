@@ -1,7 +1,7 @@
 package dev.kannich.tools
 
 import dev.kannich.test.ContainerExecutor
-import dev.kannich.test.KannichTestContainer
+import dev.kannich.test.KannichTestSpecExtension
 import dev.kannich.test.PipelineBuilder
 import io.kotest.core.extensions.install
 import io.kotest.core.spec.style.FunSpec
@@ -9,7 +9,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 
 class AptIT : FunSpec({
-    val container = install(KannichTestContainer.create())
+    val container = install(KannichTestSpecExtension())
 
     test("Apt.install installs tree package") {
         val executor = ContainerExecutor(container)

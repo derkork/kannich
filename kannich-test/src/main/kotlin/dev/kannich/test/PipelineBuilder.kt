@@ -15,7 +15,7 @@ package dev.kannich.test
  *     <artifactId>maven-failsafe-plugin</artifactId>
  *     <configuration>
  *         <systemPropertyVariables>
- *             <kannich.test.version>0.3.0</kannich.test.version>
+ *             <kannich.core.version>...</kannich.core.version>
  *             <kannich.test.m2repo>${settings.localRepository}</kannich.test.m2repo>
  *             <kannich.test.module.groupId>${project.groupId}</kannich.test.module.groupId>
  *             <kannich.test.module.artifactId>${project.artifactId}</kannich.test.module.artifactId>
@@ -110,6 +110,10 @@ class PipelineBuilder {
     }
 
     fun build(): String = buildString {
+        if (VERSION == null) {
+            throw IllegalStateException("kannich.core.version system property not set")
+        }
+
         // Default dependencies
         appendLine("@file:DependsOn(\"dev.kannich:kannich-stdlib:$VERSION\")")
         appendLine("@file:DependsOn(\"dev.kannich:kannich-tools:$VERSION\")")
@@ -136,10 +140,10 @@ class PipelineBuilder {
 
     companion object {
         /**
-         * Kannich version from kannich.test.version system property.
+         * Kannich version from kannich.core.version system property.
          * Used for default kannich-stdlib and kannich-tools dependencies.
          */
-        val VERSION: String = System.getProperty("kannich.test.version", "0.3.0")
+        val VERSION: String? = System.getProperty("kannich.core.version")
 
         /** Local module groupId from pom.xml via Failsafe */
         val MODULE_GROUP_ID: String? = System.getProperty("kannich.test.module.groupId")

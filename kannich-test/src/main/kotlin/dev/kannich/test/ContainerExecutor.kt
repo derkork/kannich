@@ -104,7 +104,9 @@ class ContainerExecutor(private val container: GenericContainer<*>) {
      * @param execution The execution name to run (default: "test")
      */
     fun run(pipeline: PipelineBuilder, execution: String = "test"): ContainerExecResult {
-        writeFile(KANNICH_FILE_PATH, pipeline.build())
+        val content = pipeline.build()
+        logger.info("Generated kannichfile: $content")
+        writeFile(KANNICH_FILE_PATH, content)
         return runKannich(execution)
     }
 
@@ -119,6 +121,9 @@ class ContainerExecutor(private val container: GenericContainer<*>) {
             "/kannich/jdk/bin/java",
             "-jar",
             "/kannich/kannich-cli.jar",
+            "-e", "http_proxy=http://squid-proxy:3128",
+            "-e", "https_proxy=http://squid-proxy:3128",
+            "-e", "no_proxy=localhost,127.0.0.1,::1",
             "-v",
             execution
         ) + extraArgs.toList()

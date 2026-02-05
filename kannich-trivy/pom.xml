@@ -7,14 +7,18 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.4.0</version>
+        <version>0.5.0</version>
         <relativePath>../kannich-parent</relativePath>
     </parent>
 
     <artifactId>kannich-trivy</artifactId>
-    <version>1.0.0</version>
+    <version>0.5.0</version>
     <name>Kannich Trivy Plugin</name>
     <description>Trivy plugin for Kannich - security scanning</description>
+
+    <properties>
+        <kannich.test.image>derkork/kannich:0.5.0-0.5.0</kannich.test.image>
+    </properties>
 
     <dependencies>
         <!-- Kotlin -->
