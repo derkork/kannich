@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-cli</artifactId>
-    <version>${kannich.core.version}</version>
+    <version>0.5.0</version>
     <name>Kannich CLI</name>
     <description>Command-line interface for Kannich</description>
 

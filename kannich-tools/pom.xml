@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-tools</artifactId>
-    <version>${kannich.core.version}</version>
+    <version>0.5.0</version>
     <name>Kannich Tools</name>
     <description>Built-in tools for Kannich scripting.</description>
 

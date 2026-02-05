@@ -54,6 +54,10 @@
 
     <dependencyManagement>
         <dependencies>
+
+            <!-- CVE Overrides -->
+            <!-- currently empty -->
+
             <!-- JUnit BOM - must be first to ensure consistent versions -->
             <dependency>
                 <groupId>org.junit</groupId>
@@ -190,6 +194,12 @@
                 <groupId>io.kotest</groupId>
                 <artifactId>kotest-extensions-testcontainers</artifactId>
                 <version>${kotest.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.kafka</groupId>
+                        <artifactId>kafka-clients</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -158,8 +158,14 @@ class ExecutionEngine(
                 val artifacts = scope.getArtifactSpecs()
                 for (spec in artifacts) {
                     when {
-                        spec.collect == On.FAILURE && result.isSuccess -> continue
-                        spec.collect == On.SUCCESS && result.isFailure -> continue
+                        spec.collect == On.FAILURE && result.isSuccess -> {
+                            logger.debug("Skipping artifact because job failed.")
+                            continue
+                        }
+                        spec.collect == On.SUCCESS && result.isFailure -> {
+                            logger.debug("Skipping artifact because job succeeded.")
+                            continue
+                        }
                     }
                     collectArtifacts(spec, Path.of(workDir)).getOrElse { return Result.failure(it) }
                 }
@@ -197,6 +203,7 @@ class ExecutionEngine(
         }
 
         if (safePaths.isEmpty()) {
+            logger.warn("No artifacts matched the patterns")
             return Result.success(Unit)
         }
 

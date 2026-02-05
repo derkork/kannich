@@ -12,9 +12,9 @@
     </parent>
 
     <artifactId>kannich-runtime</artifactId>
-    <version>${kannich.core.version}</version>
-    <name>Kannich Core</name>
-    <description>Core executor engine for Kannich CI pipelines</description>
+    <version>0.5.0</version>
+    <name>Kannich Runtime</name>
+    <description>Executor runtime for Kannich CI pipelines</description>
 
     <dependencies>
         <!-- Kotlin -->

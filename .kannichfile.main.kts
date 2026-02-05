@@ -1,9 +1,9 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.4.0")
-@file:DependsOn("dev.kannich:kannich-tools:0.4.0")
-@file:DependsOn("dev.kannich:kannich-maven:0.4.0")
-@file:DependsOn("dev.kannich:kannich-java:0.4.0")
-@file:DependsOn("dev.kannich:kannich-trivy:0.4.0")
-@file:DependsOn("dev.kannich:kannich-helm:0.4.0")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.5.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.5.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.5.0")
+@file:DependsOn("dev.kannich:kannich-java:0.5.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.5.0")
+@file:DependsOn("dev.kannich:kannich-helm:0.5.0")
 
 
 import dev.kannich.java.Java
@@ -27,7 +27,6 @@ pipeline {
             val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
             val gpgKey = requireEnv("KANNICH_GPG_KEY")
             val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
-            val version = requireEnv("KANNICH_VERSION")
             val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
             val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
 
@@ -43,41 +42,45 @@ pipeline {
 
             Gpg.importKey(gpgKey)
 
-            // set version to desired version
-            log("Setting version to $version")
-            maven.exec("-B", "-q", "versions:set", "-DnewVersion=$version")
-
             // build cli jar and docker image
             log("Building jar and docker image")
             Docker.enable()
             maven.exec("-B", "-q", "-Pbootstrap", "install", "-DskipTests")
 
+            val imageVersion = cd("kannich-builder-image") {
+                maven.getProjectVersion()
+            }
+
+            val imageBaseName = "derkork/kannich"
+            val kannichImage = "$imageBaseName:$imageVersion"
             // run trivy on docker image to detect vulnerabilities
-            log("Checking for vulnerabilities in docker image")
+            log("Checking for vulnerabilities in docker image: $kannichImage")
+
+            val home = trivy.home()
             trivy.exec(
                 "image",
-                "derkork/kannich:$version",
+                kannichImage,
                 "--exit-code", "1",
                 "--exit-on-eol", "1",
                 "--severity", "CRITICAL",
                 "--no-progress",
-                "--format", "json",
-                "--output", "trivy-results.json"
+                "--format", "template",
+                "--template", "@$home/contrib/html.tpl", "-o", "trivy-docker-results.html"
             )
 
-            artifacts {
-                includes("trivy-results.json")
+            artifacts(On.SUCCESS_OR_FAILURE) {
+                includes("trivy-docker-results.html")
             }
 
             if (!dryRun) {
                 log("Publishing docker image to docker hub")
                 Docker.login(dockerUsername, dockerPassword)
-                Docker.exec("push", "derkork/kannich:$version")
+                Docker.exec("push", kannichImage)
                 // also push to the "latest" tag if desired
                 if (setLatest) {
                     log("Setting latest tag")
-                    Docker.exec("tag", "derkork/kannich:$version", "derkork/kannich:latest")
-                    Docker.exec("push", "derkork/kannich:latest")
+                    Docker.exec("tag", kannichImage, "$imageBaseName:latest")
+                    Docker.exec("push", "$imageBaseName:latest")
                 }
 
                 log("Publishing to Maven Central")
@@ -90,13 +93,44 @@ pipeline {
         }
     }
 
-    execution("update-version") {
+    execution("dependency-check", "Verifies dependencies have no vulnerabilities") {
         job {
-            val maven = Maven("3.9.6", java)
-            val newVersion = requireEnv("KANNICH_VERSION")
-            maven.exec( "-B", "versions:set", "-DnewVersion=$newVersion", "-DgenerateBackupPoms=false")
-            artifacts {
-                includes("**pom.xml")
+            val poms = Fs.glob("*/pom.xml")
+            val home = trivy.home()
+
+            val failures = poms.mapNotNull {
+                val path = it.substringBeforeLast("/pom.xml")
+                cd (path) {
+                    Fs.mkdir("target")
+                    val success = allowFailure {
+                        trivy.exec(
+                            "fs",
+                            "--quiet",
+                            "--scanners",
+                            "vuln",
+                            ".",
+                            "--severity", "CRITICAL,HIGH",
+                            "--ignore-unfixed",
+                            "--exit-code", "1",
+                            "--format",
+                            "template",
+                            "--template",
+                            "@$home/contrib/html.tpl", "-o", "target/report.html"
+                        )
+                    }
+
+
+                    if (!success) path else null
+                }
+            }
+
+            artifacts(On.SUCCESS_OR_FAILURE) {
+                includes("*/target/report.html")
+            }
+
+
+            if(failures.isNotEmpty()) {
+                fail("Vulnerabilities found in dependencies: ${failures.joinToString(", ")}")
             }
         }
     }
@@ -106,7 +140,6 @@ pipeline {
             Cache.clear()
         }
     }
-
 
     execution("smoke-test", "Runs a set of smoke tests to verify things work in general.") {
         job {

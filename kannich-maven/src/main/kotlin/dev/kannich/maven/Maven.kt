@@ -1,6 +1,7 @@
 package dev.kannich.maven
 
 import dev.kannich.java.Java
+import dev.kannich.stdlib.FsUtil
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.KannichDsl
 import dev.kannich.stdlib.fail
@@ -215,6 +216,15 @@ class Maven(
 
         Fs.write(settingsPath, xml)
         return settingsPath
+    }
+
+    /**
+     * Returns the version of the Maven project in the current working directory.
+     */
+    suspend fun getProjectVersion():String {
+        val tempDir = Fs.mktemp()
+        exec("help:evaluate", "-Dexpression=project.version", "-q", "-Doutput=$tempDir/version.txt")
+        return Fs.readAsString("$tempDir/version.txt")
     }
 
     /**

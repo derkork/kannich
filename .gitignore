@@ -43,3 +43,4 @@ kannich-builder-image/m2-repo/*
 test_*.ps1
 *.key
 release.sh
+trivy-docker-results.html
