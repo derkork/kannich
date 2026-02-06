@@ -21,6 +21,32 @@ pipeline {
         return "true" == (getEnv(name) ?: "$defaultValue")
     }
 
+    execution("release-module", "Description releases a single module") {
+        job {
+            val gpgKey = requireEnv("KANNICH_GPG_KEY")
+            val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
+            val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
+            val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
+            val moduleName = requireEnv("KANNICH_MODULE")
+
+            Gpg.importKey(gpgKey)
+
+            val maven = Maven("3.9.6", java) {
+                server("ossrh") {
+                    username = sonatypeUsername
+                    password = sonatypePassword
+                }
+            }
+
+            maven.exec("-B", "-q", "install", "-DskipTests")
+
+            log("Publishing to Maven Central")
+            withEnv(mapOf("MAVEN_GPG_PASSPHRASE" to gpgPassphrase)) {
+                maven.exec("-B", "-Prelease", "deploy", "-DskipTests", "-pl", moduleName)
+            }
+        }
+    }
+
     execution("release", "Releases Kannich to Docker Hub and Maven Central") {
         job {
             val dockerUsername = requireEnv("KANNICH_DOCKER_USERNAME")

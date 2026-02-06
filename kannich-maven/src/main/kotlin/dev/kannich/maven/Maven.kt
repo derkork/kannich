@@ -154,23 +154,19 @@ class Maven(
         val javaHome = java.home()
 
         // Build command with settings.xml if servers are configured
-        val settingsArgs = if (servers.isNotEmpty()) {
-            val settingsPath = generateSettingsXml()
-            // Register cleanup to delete settings.xml when job completes
-            JobContext.current().onCleanup {
-                Fs.delete(settingsPath)
-            }
-            listOf("-s", settingsPath)
-        } else {
-            emptyList()
+        val settingsPath = generateSettingsXml()
+        // Register cleanup to delete settings.xml when job completes
+        JobContext.current().onCleanup {
+            Fs.delete(settingsPath)
         }
+        val settingsArgs = listOf("-s", settingsPath)
 
         // Cache the downloaded jar files.
         val repositoryCacheKey = "$CACHE_KEY/repository"
         Cache.ensureDir(repositoryCacheKey)
 
         val allArgs = listOf("-Dmaven.repo.local=${Cache.path(repositoryCacheKey)}") +
-                      settingsArgs + args.toList()
+                settingsArgs + args.toList()
 
         val env = mapOf(
             "JAVA_HOME" to javaHome,
@@ -198,10 +194,12 @@ class Maven(
 
         val xml = buildString {
             appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
-            appendLine("""<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+            appendLine(
+                """<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                              http://maven.apache.org/xsd/settings-1.0.0.xsd">""")
+                              http://maven.apache.org/xsd/settings-1.0.0.xsd">"""
+            )
             appendLine("  <servers>")
             for (server in servers) {
                 appendLine("    <server>")
@@ -211,6 +209,46 @@ class Maven(
                 appendLine("    </server>")
             }
             appendLine("  </servers>")
+
+            appendLine("""  <proxies>""")
+            // if there are proxy settings in the environment, put them into settings.xml
+            if (System.getProperty("http.proxyHost") != null) {
+                appendLine("""    <proxy>""")
+                appendLine("""      <id>http_proxy</id>""")
+                appendLine("""      <active>true</active>""")
+                appendLine("""      <protocol>http</protocol>""")
+                appendLine("""      <host>${System.getProperty("http.proxyHost")}</host>""")
+                appendLine("""      <port>${System.getProperty("http.proxyPort")}</port>""")
+                appendLine("""      <nonProxyHosts>${System.getProperty("http.nonProxyHosts")}</nonProxyHosts>""")
+                // append username and password if they are set
+                System.getProperty("http.proxyUser")?.let { user ->
+                    appendLine("""      <username>$user</username>""")
+                }
+                System.getProperty("http.proxyPassword")?.let { password ->
+                    appendLine("""      <password>$password</password>""")
+                }
+                appendLine("""    </proxy>""")
+            }
+            // same for https
+            if (System.getProperty("https.proxyHost") != null) {
+                appendLine("""    <proxy>""")
+                appendLine("""      <id>https_proxy</id>""")
+                appendLine("""      <active>true</active>""")
+                appendLine("""      <protocol>https</protocol>""")
+                appendLine("""      <host>${System.getProperty("https.proxyHost")}</host>""")
+                appendLine("""      <port>${System.getProperty("https.proxyPort")}</port>""")
+                appendLine("""      <nonProxyHosts>${System.getProperty("https.nonProxyHosts")}</nonProxyHosts>""")
+                // append username and password if they are set
+                System.getProperty("https.proxyUser")?.let { user ->
+                    appendLine("""      <username>$user</username>""")
+                }
+                System.getProperty("https.proxyPassword")?.let { password ->
+                    appendLine("""      <password>$password</password>""")
+                }
+                appendLine("""    </proxy>""")
+            }
+
+            appendLine("""  </proxies>""")
             appendLine("</settings>")
         }
 
@@ -221,7 +259,7 @@ class Maven(
     /**
      * Returns the version of the Maven project in the current working directory.
      */
-    suspend fun getProjectVersion():String {
+    suspend fun getProjectVersion(): String {
         val tempDir = Fs.mktemp()
         exec("help:evaluate", "-Dexpression=project.version", "-q", "-Doutput=$tempDir/version.txt")
         return Fs.readAsString("$tempDir/version.txt")

@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-maven</artifactId>
-    <version>0.5.0</version>
+    <version>0.6.0</version>
     <name>Kannich Maven Plugin</name>
     <description>Maven plugin for Kannich - Maven build support</description>
 
