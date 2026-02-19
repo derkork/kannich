@@ -23,6 +23,7 @@
         <module>kannich-java</module>
         <module>kannich-maven</module>
         <module>kannich-trivy</module>
+        <module>kannich-pre-commit</module>
         <module>kannich-helm</module>
     </modules>
 
