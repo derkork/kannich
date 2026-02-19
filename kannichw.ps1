@@ -6,6 +6,14 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $KannichImage = if ($env:KANNICH_IMAGE) { $env:KANNICH_IMAGE } else { "derkork/kannich:latest" }
 
+# Docker proxy support - prefix image if configured
+if ($env:KANNICH_DOCKER_PROXY_PREFIX) {
+    # Only prefix if the image doesn't already start with the prefix
+    if (-not $KannichImage.StartsWith($env:KANNICH_DOCKER_PROXY_PREFIX)) {
+        $KannichImage = $env:KANNICH_DOCKER_PROXY_PREFIX + $KannichImage
+    }
+}
+
 # Determine project directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = if ($env:PROJECT_DIR) { $env:PROJECT_DIR } else { $ScriptDir }
@@ -20,6 +28,14 @@ $null = docker info 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Error: Docker daemon not running. Please start Docker."
     exit 1
+}
+
+# Docker proxy login if configured
+if ($env:KANNICH_DOCKER_PROXY_URL) {
+    if ($env:KANNICH_DOCKER_PROXY_USERNAME -and $env:KANNICH_DOCKER_PROXY_PASSWORD) {
+        Write-Host "Logging in to Docker proxy: $env:KANNICH_DOCKER_PROXY_URL"
+        $env:KANNICH_DOCKER_PROXY_PASSWORD | docker login $env:KANNICH_DOCKER_PROXY_URL -u $env:KANNICH_DOCKER_PROXY_USERNAME --password-stdin
+    }
 }
 
 if ($env:KANNICH_CACHE_DIR) {

@@ -7,6 +7,14 @@ set -e
 # Configuration
 KANNICH_IMAGE="${KANNICH_IMAGE:-derkork/kannich:latest}"
 
+# Docker proxy support - prefix image if configured
+if [ -n "$KANNICH_DOCKER_PROXY_PREFIX" ]; then
+    # Only prefix if the image doesn't already start with the prefix
+    if [ "${KANNICH_IMAGE#"$KANNICH_DOCKER_PROXY_PREFIX"}" = "$KANNICH_IMAGE" ]; then
+        KANNICH_IMAGE="${KANNICH_DOCKER_PROXY_PREFIX}${KANNICH_IMAGE}"
+    fi
+fi
+
 # Determine project directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
@@ -20,6 +28,14 @@ fi
 if ! docker info >/dev/null 2>&1; then
     echo "Error: Docker daemon not running. Please start Docker." >&2
     exit 1
+fi
+
+# Docker proxy login if configured
+if [ -n "$KANNICH_DOCKER_PROXY_URL" ]; then
+    if [ -n "$KANNICH_DOCKER_PROXY_USERNAME" ] && [ -n "$KANNICH_DOCKER_PROXY_PASSWORD" ]; then
+        echo "Logging in to Docker proxy: $KANNICH_DOCKER_PROXY_URL"
+        echo "$KANNICH_DOCKER_PROXY_PASSWORD" | docker login "$KANNICH_DOCKER_PROXY_URL" -u "$KANNICH_DOCKER_PROXY_USERNAME" --password-stdin
+    fi
 fi
 
 if [ -n "$KANNICH_CACHE_DIR" ]; then
