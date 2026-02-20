@@ -82,6 +82,10 @@ pipeline {
             // run trivy on docker image to detect vulnerabilities
             log("Checking for vulnerabilities in docker image: $kannichImage")
 
+            artifacts(On.SUCCESS_OR_FAILURE) {
+                includes("trivy-docker-results.html")
+            }
+
             val home = trivy.home()
             trivy.exec(
                 "image",
@@ -94,9 +98,6 @@ pipeline {
                 "--template", "@$home/contrib/html.tpl", "-o", "trivy-docker-results.html"
             )
 
-            artifacts(On.SUCCESS_OR_FAILURE) {
-                includes("trivy-docker-results.html")
-            }
 
             if (!dryRun) {
                 log("Publishing docker image to docker hub")
