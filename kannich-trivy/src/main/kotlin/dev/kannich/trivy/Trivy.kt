@@ -1,5 +1,6 @@
 package dev.kannich.trivy
 
+import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
 import dev.kannich.tools.Compressor
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Trivy(val version: String) {
+class Trivy(val version: String) : Tool {
     private val logger: Logger = LoggerFactory.getLogger(Trivy::class.java)
 
     companion object {
@@ -51,11 +52,14 @@ class Trivy(val version: String) {
     suspend fun home(): String =
         Cache.path("$CACHE_KEY/trivy-$version")
 
+
+    override suspend fun getToolPaths() = listOf(home())
+
     /**
      * Ensures Trivy is installed in the Cache.
      * Downloads from GitHub releases if not already present.
      */
-    private suspend fun ensureInstalled() {
+    override suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/trivy-$version"
 
         if (Cache.exists(cacheKey)) {
@@ -88,10 +92,8 @@ class Trivy(val version: String) {
 
     /**
      * Executes Trivy with the given arguments.
-     * Throws JobFailedException if the execution fails.
      *
      * @param args Arguments to pass to Trivy
-     * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
     suspend fun exec(vararg args: String) {
         ensureInstalled()
@@ -111,6 +113,34 @@ class Trivy(val version: String) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Trivy command failed: $errorMessage")
         }
+    }
+
+
+    /**
+     * Scans a filesystem for vulnerabilities and generates an HTML report.
+     *
+     * @param reportPath Path to save the HTML report, defaults to 'target/report.html'
+     * @param severity Severity level to filter vulnerabilities, defaults to 'CRITICAL,HIGH'
+     */
+    suspend fun scanFs(reportPath: String = "target/report.html", severity: String = "CRITICAL,HIGH") {
+        // ensure parent directory of output file exists
+        val parentDir = Fs.getParent(reportPath)
+        Fs.mkdir(parentDir)
+
+        exec(
+            "fs",
+            "--quiet",
+            "--scanners",
+            "vuln",
+            ".",
+            "--severity", severity,
+            "--ignore-unfixed",
+            "--exit-code", "1",
+            "--format",
+            "template",
+            "--template",
+            "@${home()}/contrib/html.tpl", "-o", reportPath
+        )
     }
 
     /**

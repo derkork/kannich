@@ -34,6 +34,11 @@ object Fs {
     suspend fun resolve(path: String): String = resolvePath(path).toUnixString()
 
     /**
+     * Returns the parent directory of the given path.
+     */
+    suspend fun getParent(path: String): String = resolvePath(path).parent.toUnixString()
+
+    /**
      * Creates a temporary directory and returns its path.
      *
      * @param prefix Optional prefix for the temp directory name
@@ -123,6 +128,21 @@ object Fs {
         return withContext(Dispatchers.IO) {
             FsUtil.exists(target).getOrElse { e ->
                 fail("Failed to check if path exists $path: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Changes the permissions of a file or directory.
+     *
+     * @param path The path of the file or directory to change permissions
+     * @param mode The permissions to set, in octal format (e.g. "755")
+     */
+    suspend fun chmod(path:String, mode:String)  {
+        val target = resolvePath(path)
+        withContext(Dispatchers.IO) {
+            FsUtil.chmod(target, mode).onFailure { e ->
+                fail("Failed to chmod $path: ${e.message}")
             }
         }
     }

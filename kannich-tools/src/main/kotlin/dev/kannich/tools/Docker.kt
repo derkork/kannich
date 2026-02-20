@@ -30,10 +30,10 @@ object Docker {
      * Enables docker support in the container. As starting docker takes a few seconds this is
      * done only when needed.
      */
-    suspend fun enable(daemonJson:String = "") {
+    suspend fun enable(daemonJson: String = "") {
         val dockerRunning = isEnabled()
 
-        val daemonJsonContent = FsUtil.readAsString(Path.of("/etc/docker/daemon.json")).getOrElse {""}
+        val daemonJsonContent = FsUtil.readAsString(Path.of("/etc/docker/daemon.json")).getOrElse { "" }
         if (daemonJsonContent != daemonJson) {
             if (dockerRunning) {
                 val result = Shell.execShell("supervisorctl stop dockerd", silent = true)
@@ -47,8 +47,7 @@ object Docker {
                 FsUtil.delete(Path.of("/etc/docker/daemon.json")).getOrElse {
                     fail("Failed to delete daemon.json")
                 }
-            }
-            else {
+            } else {
                 logger.info("Updating daemon.json.")
                 FsUtil.write(Path.of("/etc/docker/daemon.json"), daemonJson).getOrElse {
                     fail("Failed to write daemon.json")
@@ -82,7 +81,7 @@ object Docker {
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
     suspend fun exec(vararg args: String, silent: Boolean = false): ExecResult {
-        if (!isEnabled())  {
+        if (!isEnabled()) {
             fail("Docker is not enabled. Please enable it by calling Docker.enable().")
         }
         val result = Shell.exec("docker", *args, silent = silent)
@@ -91,6 +90,18 @@ object Docker {
             fail("Docker command failed: $errorMessage")
         }
         return result
+    }
+
+
+    /**
+     * Tags a local image to a remote registry and pushes it.
+     *
+     * @param localImage The local image name
+     * @param targetImage The target image name
+     */
+    suspend fun tagAndPush(localImage: String, targetImage: String) {
+        exec("tag", localImage, targetImage)
+        exec("push", targetImage)
     }
 
     /**
@@ -105,7 +116,7 @@ object Docker {
      */
     suspend fun login(username: String, password: String, registry: String? = null): ExecResult {
         secret(password)
-        if (!isEnabled())  {
+        if (!isEnabled()) {
             fail("Docker is not enabled. Please enable it by calling Docker.enable().")
         }
         logger.info("Logging into Docker registry with username '$username' and registry '${registry ?: "Docker Hub"}'")

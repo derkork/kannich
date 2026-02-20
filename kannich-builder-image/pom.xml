@@ -7,12 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.5.0</version>
+        <version>0.6.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-builder-image</artifactId>
-    <version>0.5.0-${kannich.core.version}</version>
+    <version>0.6.0-${kannich.core.version}</version>
     <packaging>pom</packaging>
 
     <name>Kannich Builder Image</name>

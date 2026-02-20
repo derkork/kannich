@@ -5,6 +5,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.PosixFilePermission
 
 /**
  * Utility for filesystem operations. All operations work on absolute paths.
@@ -41,6 +42,63 @@ object FsUtil {
         logger.debug("Creating directory: {}", path)
         checkAbsolute(path)
         Files.createDirectories(path)
+    }
+
+    /**
+     * Changes the permissions of a file or directory.
+     *
+     * @param path The path of the file or directory to change permissions
+     * @param perms The permissions to set, in octal format (e.g. "755")
+     */
+    fun chmod(path: Path, perms: String): Result<Unit> = runCatching {
+        logger.debug("Changing permissions of {} to {}", path, perms)
+        checkAbsolute(path)
+
+        if (perms.length != 3) {
+            fail("Invalid permissions format: $perms")
+        }
+
+        val ownerPerm = perms[0].digitToIntOrNull() ?: fail("Invalid owner permission ${perms[0]}")
+        val groupPerm = perms[1].digitToIntOrNull() ?: fail("Invalid group permission ${perms[1]}")
+        val otherPerm = perms[2].digitToIntOrNull() ?: fail("Invalid other permission ${perms[2]}")
+
+
+        when {
+            ownerPerm !in 0..7 -> fail("Invalid owner permission ${perms[0]}")
+            groupPerm !in 0..7 -> fail("Invalid group permission ${perms[1]}")
+            otherPerm !in 0..7 -> fail("Invalid other permission ${perms[2]}")
+        }
+
+        val newPerms = mutableSetOf<PosixFilePermission>()
+        if (ownerPerm.and(1) > 0) {
+            newPerms.add(PosixFilePermission.OWNER_EXECUTE)
+        }
+        if (ownerPerm.and(2) > 0) {
+            newPerms.add(PosixFilePermission.OWNER_WRITE)
+        }
+        if (ownerPerm.and(4) > 0) {
+            newPerms.add(PosixFilePermission.OWNER_READ)
+        }
+        if (groupPerm.and(1) > 0) {
+            newPerms.add(PosixFilePermission.GROUP_EXECUTE)
+        }
+        if (groupPerm.and(2) > 0) {
+            newPerms.add(PosixFilePermission.GROUP_WRITE)
+        }
+        if (groupPerm.and(4) > 0) {
+            newPerms.add(PosixFilePermission.GROUP_READ)
+        }
+        if (otherPerm.and(1) > 0) {
+            newPerms.add(PosixFilePermission.OTHERS_EXECUTE)
+        }
+        if (otherPerm.and(2) > 0) {
+            newPerms.add(PosixFilePermission.OTHERS_WRITE)
+        }
+        if (otherPerm.and(4) > 0) {
+            newPerms.add(PosixFilePermission.OTHERS_READ)
+        }
+
+        Files.setPosixFilePermissions(path, newPerms)
     }
 
     /**

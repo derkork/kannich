@@ -1,6 +1,7 @@
 package dev.kannich.precommit
 
 import dev.kannich.stdlib.JobContext
+import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
 import dev.kannich.tools.Fs
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class PreCommit(val version: String) {
+class PreCommit(val version: String) : Tool {
     private val logger: Logger = LoggerFactory.getLogger(PreCommit::class.java)
 
     companion object {
@@ -51,11 +52,14 @@ class PreCommit(val version: String) {
     suspend fun home(): String =
         Cache.path("$CACHE_KEY/pre-commit-$version")
 
+
+    override suspend fun getToolPaths() = listOf(home())
+
     /**
      * Ensures pre-commit is installed in the Cache.
      * Downloads from GitHub releases if not already present.
      */
-    private suspend fun ensureInstalled() {
+    override suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/pre-commit-$version"
 
         if (Cache.exists(cacheKey)) {

@@ -8,6 +8,7 @@ import dev.kannich.tools.Fs
 import dev.kannich.tools.Shell
 import dev.kannich.tools.Web
 import dev.kannich.stdlib.FsKind
+import dev.kannich.stdlib.Tool
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -25,7 +26,7 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Java(val version: String) {
+class Java(val version: String) : Tool {
     private val logger: Logger = LoggerFactory.getLogger(Java::class.java)
 
     companion object {
@@ -38,11 +39,14 @@ class Java(val version: String) {
     suspend fun home(): String =
         Cache.path("$CACHE_KEY/temurin-$version")
 
+
+    override suspend fun getToolPaths() = listOf("${home()}/bin")
+
     /**
      * Ensures Java is installed in the Cache.
      * Downloads from Adoptium (Eclipse Temurin) if not already present.
      */
-    suspend fun ensureInstalled() {
+    override suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/temurin-$version"
 
         if (Cache.exists(cacheKey)) {

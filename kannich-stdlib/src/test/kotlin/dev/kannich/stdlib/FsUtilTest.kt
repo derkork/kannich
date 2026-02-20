@@ -5,6 +5,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 
 class FsUtilTest : FunSpec({
 
@@ -275,5 +276,66 @@ class FsUtilTest : FunSpec({
 
         val exception = FsUtil.mkdir(Path.of("relative")).exceptionOrNull()
         (exception is IllegalArgumentException) shouldBe true
+    }
+
+    test("test chmod") {
+        val file = root.resolve("perm.txt")
+        Files.write(file, "content".toByteArray())
+
+        val testCases = listOf(
+            "777" to setOf(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
+                PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE, PosixFilePermission.OTHERS_EXECUTE
+            ),
+            "644" to setOf(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.OTHERS_READ
+            ),
+            "755" to setOf(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE,
+                PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE
+            ),
+            "512" to setOf(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_EXECUTE,
+                PosixFilePermission.OTHERS_WRITE
+            ),
+            "000" to emptySet()
+        )
+
+        for ((perms, expected) in testCases) {
+            FsUtil.chmod(file, perms).getOrThrow()
+            Files.getPosixFilePermissions(file) shouldBe expected
+        }
+    }
+
+    test("test chmod invalid format") {
+        val file = root.resolve("perm_invalid.txt")
+        Files.write(file, "content".toByteArray())
+
+        FsUtil.chmod(file, "77").isFailure shouldBe true
+        FsUtil.chmod(file, "7777").isFailure shouldBe true
+        FsUtil.chmod(file, "abc").isFailure shouldBe true
+        FsUtil.chmod(file, "877").isFailure shouldBe true
+        FsUtil.chmod(file, "787").isFailure shouldBe true
+        FsUtil.chmod(file, "778").isFailure shouldBe true
+    }
+
+    test("test chmod directory") {
+        val dir = root.resolve("perm_dir")
+        Files.createDirectory(dir)
+        FsUtil.chmod(dir, "750").getOrThrow()
+        Files.getPosixFilePermissions(dir) shouldBe setOf(
+            PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+            PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE
+        )
+    }
+
+    test("test chmod nonexistent path") {
+        val nonexistent = root.resolve("nonexistent.txt")
+        FsUtil.chmod(nonexistent, "777").isFailure shouldBe true
     }
 })

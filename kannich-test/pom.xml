@@ -7,12 +7,11 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.5.0</version>
+        <version>0.6.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-test</artifactId>
-    <version>${kannich.core.version}</version>
     <name>Kannich Test Infrastructure</name>
     <description>Reusable test infrastructure for Kannich integration tests</description>
 

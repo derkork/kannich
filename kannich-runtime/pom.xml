@@ -7,12 +7,11 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.5.0</version>
+        <version>0.6.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-runtime</artifactId>
-    <version>0.5.0</version>
     <name>Kannich Runtime</name>
     <description>Executor runtime for Kannich CI pipelines</description>
 

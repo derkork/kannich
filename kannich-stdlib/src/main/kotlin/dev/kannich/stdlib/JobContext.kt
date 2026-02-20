@@ -95,6 +95,24 @@ class JobContext(
     }
 
     /**
+     * Changes the environment PATH variable to include the given tools' paths for the duration of the block.
+     *
+     * @param tools The tools to include in the PATH variable
+     * @param block The block to execute with the new PATH variable
+     * @return The result of the block
+     */
+    suspend fun <T> withTools(vararg tools: Tool, block: suspend () -> T): T {
+        val path = env["PATH"]
+        val toolsPath = tools.flatMap { it.getToolPaths() }.joinToString(":")
+        val finalPath = when (path) {
+            null -> toolsPath
+            else -> "$toolsPath:$path"
+        }
+
+        return withEnv(mapOf("PATH" to finalPath), block)
+    }
+
+    /**
      * Runs all registered cleanup actions in reverse order.
      * Exceptions during cleanup are logged but don't prevent other cleanups from running.
      * Used by ExecutionEngine after job execution.

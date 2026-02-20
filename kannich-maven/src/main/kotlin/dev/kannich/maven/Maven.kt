@@ -4,6 +4,7 @@ import dev.kannich.java.Java
 import dev.kannich.stdlib.FsUtil
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.KannichDsl
+import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Compressor
 import dev.kannich.tools.Shell
@@ -89,7 +90,7 @@ class Maven(
     val version: String,
     private val java: Java,
     block: MavenBuilder.() -> Unit = {}
-) {
+) : Tool {
     private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
     private val config = MavenBuilder().apply(block)
     private val servers = config.servers
@@ -105,11 +106,13 @@ class Maven(
     suspend fun home(): String =
         Cache.path("$CACHE_KEY/apache-maven-$version")
 
+    override suspend fun getToolPaths() = listOf("${home()}/bin")
+
     /**
      * Ensures Maven is installed in the Cache.
      * Also ensures Java is installed first since Maven depends on it.
      */
-    suspend fun ensureInstalled() {
+    override suspend fun ensureInstalled() {
         // Ensure Java is installed first
         java.ensureInstalled()
 

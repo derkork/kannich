@@ -1,5 +1,6 @@
 package dev.kannich.helm
 
+import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
 import dev.kannich.tools.Compressor
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Helm(val version: String) {
+class Helm(val version: String) : Tool {
     private val logger: Logger = LoggerFactory.getLogger(Helm::class.java)
 
     companion object {
@@ -52,11 +53,14 @@ class Helm(val version: String) {
     suspend fun home(): String =
         Cache.path("$CACHE_KEY/helm-$version")
 
+
+    override suspend fun getToolPaths() = listOf(home())
+
     /**
      * Ensures Helm is installed in the Cache.
      * Downloads from get.helm.sh if not already present.
      */
-    private suspend fun ensureInstalled() {
+    override suspend fun ensureInstalled() {
         val cacheKey = "$CACHE_KEY/helm-$version"
 
         if (Cache.exists(cacheKey)) {

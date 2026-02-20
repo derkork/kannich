@@ -11,10 +11,14 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>kannich-helm</artifactId>
-    <version>0.6.0</version>
-    <name>Kannich Helm Plugin</name>
-    <description>Helm plugin for Kannich - Kubernetes package manager</description>
+    <artifactId>kannich-quarkus</artifactId>
+    <version>0.1.0</version>
+    <name>Kannich Quarkus Plugin</name>
+    <description>Quarkus plugin for Kannich - Quarkus build support</description>
+
+    <properties>
+        <kannich.test.image>derkork/kannich:0.6.0-0.6.0</kannich.test.image>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -25,6 +29,12 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-tools</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-maven</artifactId>
+            <version>0.6.0</version>
         </dependency>
 
         <dependency>
@@ -41,6 +51,12 @@
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
