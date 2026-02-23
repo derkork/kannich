@@ -20,7 +20,8 @@ import org.slf4j.LoggerFactory
 data class ServerConfig(
     val id: String,
     val username: String,
-    val password: String
+    val password: String,
+    val headers:Map<String,String>
 )
 
 /**
@@ -30,8 +31,13 @@ data class ServerConfig(
 class ServerBuilder(private val id: String) {
     var username: String = ""
     var password: String = ""
+    private val headers = mutableMapOf<String, String>()
 
-    internal fun build() = ServerConfig(id, username, password)
+    fun header(name:String, value:String) {
+        headers[name] = value
+    }
+
+    internal fun build() = ServerConfig(id, username, password, headers)
 }
 
 /**
@@ -203,12 +209,29 @@ class Maven(
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
                               http://maven.apache.org/xsd/settings-1.0.0.xsd">"""
             )
+
             appendLine("  <servers>")
             for (server in servers) {
                 appendLine("    <server>")
                 appendLine("      <id>${escapeXml(server.id)}</id>")
-                appendLine("      <username>${escapeXml(server.username)}</username>")
-                appendLine("      <password>${escapeXml(server.password)}</password>")
+                if (server.username.isNotBlank()) {
+                    appendLine("      <username>${escapeXml(server.username)}</username>")
+                }
+                if (server.password.isNotBlank()) {
+                    appendLine("      <password>${escapeXml(server.password)}</password>")
+                }
+                if (server.headers.isNotEmpty()) {
+                    appendLine("      <configuration>")
+                    for ((key, value) in server.headers) {
+                        appendLine("        <httpHeaders>")
+                        appendLine("          <property>")
+                        appendLine("            <name>${escapeXml(key)}</name>")
+                        appendLine("            <value>${escapeXml(value)}</value>")
+                        appendLine("          </property>")
+                        appendLine("        </httpHeaders>")
+                    }
+                    appendLine("      </configuration>")
+                }
                 appendLine("    </server>")
             }
             appendLine("  </servers>")
