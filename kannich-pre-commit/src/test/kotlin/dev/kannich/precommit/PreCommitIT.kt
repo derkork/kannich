@@ -31,7 +31,7 @@ class PreCommitIT : FunSpec({
     }
 
     // TODO: fix the problem that kannich cannot run twice in the same container, then re-enable this test.
-    xtest("PreCommit module can run sample-config command") {
+    test("PreCommit module can run sample-config command") {
         val executor = ContainerExecutor(container)
 
         val pipeline = PipelineBuilder()

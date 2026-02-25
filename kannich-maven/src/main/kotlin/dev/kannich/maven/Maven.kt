@@ -21,7 +21,7 @@ data class ServerConfig(
     val id: String,
     val username: String,
     val password: String,
-    val headers:Map<String,String>
+    val headers: Map<String, String>
 )
 
 /**
@@ -33,7 +33,7 @@ class ServerBuilder(private val id: String) {
     var password: String = ""
     private val headers = mutableMapOf<String, String>()
 
-    fun header(name:String, value:String) {
+    fun header(name: String, value: String) {
         headers[name] = value
     }
 
@@ -54,8 +54,10 @@ class MavenBuilder {
      * @param id The server id
      * @param block Configuration block for the server
      */
-    fun server(id: String, block: ServerBuilder.() -> Unit) {
-        servers.add(ServerBuilder(id).apply(block).build())
+    suspend fun server(id: String, block: suspend ServerBuilder.() -> Unit) {
+        val builder = ServerBuilder(id)
+        builder.block()
+        servers.add(builder.build())
     }
 }
 
@@ -168,7 +170,14 @@ class Maven(
         JobContext.current().onCleanup {
             Fs.delete(settingsPath)
         }
-        val settingsArgs = listOf("-s", settingsPath)
+        val settingsArgs = mutableListOf("-s", settingsPath)
+
+        // if a kannich-wide settings.xml exists, merge it with the local settings
+        if (Fs.exists("/root/.m2/settings.xml")) {
+            logger.debug("Using Kannich bootstrap settings.xml.")
+            settingsArgs.add("-gs")
+            settingsArgs.add("/root/.m2/settings.xml")
+        }
 
         // Cache the downloaded jar files.
         val repositoryCacheKey = "$CACHE_KEY/repository"

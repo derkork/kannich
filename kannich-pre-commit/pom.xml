@@ -7,17 +7,17 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.6.0</version>
+        <version>0.7.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-pre-commit</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
     <name>Kannich Pre-Commit Plugin</name>
     <description>Pre-commit plugin for Kannich - git hook framework</description>
 
     <properties>
-        <kannich.test.image>derkork/kannich:0.6.0-0.6.0</kannich.test.image>
+        <kannich.test.image>derkork/kannich:0.7.0-0.7.0</kannich.test.image>
     </properties>
 
     <dependencies>

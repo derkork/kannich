@@ -115,6 +115,9 @@ class ContainerExecutor(private val container: GenericContainer<*>) {
      * @param extraArgs Additional arguments to pass to kannich
      */
     fun runKannich(execution: String = "test", vararg extraArgs: String): ContainerExecResult {
+        // kannich will link .m2/repository on start and will fail if we try to start it a second time.
+        // therefore we need to delete this symlink before starting kannich.
+        exec("rm", "-f", "/root/.m2/repository", silent = true)
         val args = listOf(
             "/kannich/jdk/bin/java",
             "-jar",

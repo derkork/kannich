@@ -95,6 +95,13 @@ if [ -t 1 ]; then
     TTY_FLAG="-t"
 fi
 
+# If KANNICH_BOOTSTRAP_SETTINGS_XML is not set, try to read $HOME/.m2/settings.xml into this variable
+# if it exists.
+if [ -z "$KANNICH_BOOTSTRAP_SETTINGS_XML" ] && [ -f "$HOME/.m2/settings.xml" ]; then
+    KANNICH_BOOTSTRAP_SETTINGS_XML=$(cat "$HOME/.m2/settings.xml")
+    export KANNICH_BOOTSTRAP_SETTINGS_XML
+fi
+
 # Put all environment variables into a file named ".kannich_current_env"
 # Use null bytes as delimiters to handle multiline values unambiguously
 awk 'BEGIN { for (name in ENVIRON) printf "%s=%s%c", name, ENVIRON[name], 0 }' > "$PROJECT_DIR/.kannich_current_env"
@@ -106,7 +113,6 @@ cleanup() {
 
 # someone presses CTRL+C, we stop the container to make sure we have no leftovers
 trap cleanup EXIT INT TERM
-
 
 # Run Kannich inside Docker
 # shellcheck disable=SC2086

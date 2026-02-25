@@ -61,6 +61,17 @@ class JobScope(name: String?) : Logging by LoggingImpl("Job${if (name != null) "
     }
 
     /**
+     * Changes the environment PATH variable to include the given tools' paths for the duration of the block.
+     *
+     * @param tools The tools to include in the PATH variable
+     * @param block The block to execute with the new PATH variable
+     * @return The result of the block
+     */
+    suspend fun <T> withTools(vararg tools: Tool, block: suspend () -> T): T {
+        return JobContext.current().withTools(*tools, block = block)
+    }
+
+    /**
      * Registers a cleanup action to run when the job completes.
      * Cleanup actions run in reverse order (last registered runs first).
      * Cleanup runs regardless of job success or failure.

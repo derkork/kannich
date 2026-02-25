@@ -7,17 +7,17 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.6.0</version>
+        <version>0.7.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-quarkus</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>Kannich Quarkus Plugin</name>
     <description>Quarkus plugin for Kannich - Quarkus build support</description>
 
     <properties>
-        <kannich.test.image>derkork/kannich:0.6.0-0.6.0</kannich.test.image>
+        <kannich.test.image>derkork/kannich:0.7.0-0.7.0</kannich.test.image>
     </properties>
 
     <dependencies>
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-maven</artifactId>
-            <version>0.6.0</version>
+            <version>0.7.0</version>
         </dependency>
 
         <dependency>

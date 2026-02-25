@@ -57,11 +57,13 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
 
-        setupMavenRepository()
-
         val finalEnv = buildEnvironment()
-
         DefaultEnv.env = finalEnv
+
+        val settingsXml = finalEnv["KANNICH_BOOTSTRAP_SETTINGS_XML"] ?: ""
+
+        setupMavenRepository(settingsXml)
+
 
         // Configure proxy for Maven dependency resolution
         ProxyConfiguration.configureFromEnvironment(finalEnv)
@@ -188,7 +190,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         return false
     }
 
-    private fun setupMavenRepository() {
+    private fun setupMavenRepository(settingsXml: String) {
         val m2Dir = File("/root/.m2")
         m2Dir.mkdirs()
 
@@ -205,6 +207,11 @@ class KannichCommand : CliktCommand(name = "kannich") {
             val cacheRepo = File("${Kannich.CACHE_DIR}/kannich-deps")
             cacheRepo.mkdirs()
             cacheRepo.toPath()
+        }
+
+        if (settingsXml.isNotBlank()) {
+            val settingsFile = File(m2Dir, "settings.xml")
+            settingsFile.writeText(settingsXml)
         }
 
         val repoDir = m2Dir.resolve("repository")

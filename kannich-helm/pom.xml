@@ -7,12 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.6.0</version>
+        <version>0.7.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-helm</artifactId>
-    <version>0.6.0</version>
+    <version>0.7.0</version>
     <name>Kannich Helm Plugin</name>
     <description>Helm plugin for Kannich - Kubernetes package manager</description>
 
