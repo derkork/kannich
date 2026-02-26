@@ -100,6 +100,15 @@ if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {
     $TtyFlag = @("-t")
 }
 
+# If KANNICH_BOOTSTRAP_SETTINGS_XML is not set, try to read $HOME/.m2/settings.xml into this variable
+# if it exists.
+if (-not $env:KANNICH_BOOTSTRAP_SETTINGS_XML) {
+    $SettingsXmlPath = Join-Path $env:USERPROFILE ".m2\settings.xml"
+    if (Test-Path $SettingsXmlPath -PathType Leaf) {
+        $env:KANNICH_BOOTSTRAP_SETTINGS_XML = Get-Content $SettingsXmlPath -Raw
+    }
+}
+
 # Put all environment variables into a file named ".kannich_current_env"
 # Use null bytes as delimiters to handle multiline values unambiguously
 $EnvFile = Join-Path $ProjectDir ".kannich_current_env"
