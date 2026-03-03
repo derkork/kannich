@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-uv</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <name>Kannich UV Plugin</name>
     <description>UV plugin for Kannich - installs and runs UV tool for Python</description>
 

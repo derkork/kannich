@@ -93,10 +93,11 @@ class Uv(val version: String) : Tool {
 
         val homeDir = home()
         val uvBinary = "$homeDir/uv"
-        val uvCacheDir = "$CACHE_KEY/uv-cache"
-        Cache.ensureDir(uvCacheDir)
+        val uvCacheKey = "$CACHE_KEY/uv-cache"
+        Cache.ensureDir(uvCacheKey)
+        val uvCachePath = Cache.path(uvCacheKey)
 
-        val result = JobContext.current().withEnv(mapOf("UV_CACHE_DIR" to uvCacheDir)) {
+        val result = JobContext.current().withEnv(mapOf("UV_CACHE_DIR" to uvCachePath)) {
            Shell.exec(uvBinary, *args)
         }
 
