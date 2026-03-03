@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-gcloud-cli</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>Kannich Google Cloud CLI Plugin</name>
     <description>Google Cloud CLI plugin for Kannich - installs and runs gcloud CLI</description>
 

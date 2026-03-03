@@ -1,5 +1,6 @@
 package dev.kannich.terraform
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
@@ -84,7 +85,7 @@ class Terraform(val version: String) : Tool {
      *
      * @param args Arguments to pass to Terraform
      */
-    suspend fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -96,6 +97,8 @@ class Terraform(val version: String) : Tool {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Terraform command failed: $errorMessage")
         }
+
+        return result
     }
 
 

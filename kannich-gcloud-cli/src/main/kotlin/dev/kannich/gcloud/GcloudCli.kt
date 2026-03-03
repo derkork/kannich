@@ -1,5 +1,6 @@
 package dev.kannich.gcloud
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
@@ -81,7 +82,7 @@ class GcloudCli(val version: String) : Tool {
      *
      * @param args Arguments to pass to `gcloud`
      */
-    suspend fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -90,9 +91,11 @@ class GcloudCli(val version: String) : Tool {
         val result = Shell.exec(gcloudBinary, *args)
 
         if (!result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${'$'}{result.exitCode}" }
-            fail("gcloud CLI command failed: ${'$'}errorMessage")
+            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
+            fail("gcloud CLI command failed: $errorMessage")
         }
+
+        return result
     }
 
     /**

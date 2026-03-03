@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-terraform</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>Kannich Terraform Plugin</name>
     <description>Terraform plugin for Kannich - Infrastructure as Code</description>
 
