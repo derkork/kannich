@@ -24,8 +24,12 @@
         <module>kannich-maven</module>
         <module>kannich-quarkus</module>
         <module>kannich-trivy</module>
+        <module>kannich-terraform</module>
         <module>kannich-pre-commit</module>
         <module>kannich-helm</module>
+        <module>kannich-aws-cli</module>
+        <module>kannich-gcloud-cli</module>
+        <module>kannich-uv</module>
     </modules>
 
     <licenses>
