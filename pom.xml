@@ -30,6 +30,7 @@
         <module>kannich-aws-cli</module>
         <module>kannich-gcloud-cli</module>
         <module>kannich-uv</module>
+        <module>kannich-node</module>
     </modules>
 
     <licenses>
