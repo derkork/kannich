@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-aws-cli</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
     <name>Kannich AWS CLI Plugin</name>
     <description>AWS CLI plugin for Kannich - installs and runs AWS CLI v2</description>
 

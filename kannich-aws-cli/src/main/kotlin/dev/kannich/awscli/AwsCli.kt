@@ -82,13 +82,13 @@ class AwsCli(val version: String) : Tool {
      *
      * @param args Arguments to pass to `aws`
      */
-    suspend fun exec(vararg args: String) : ExecResult {
+    suspend fun exec(vararg args: String, silent: Boolean = false) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
         val awsBinary = "$homeDir/aws/dist/aws"
 
-        val result = Shell.exec(awsBinary, *args)
+        val result = Shell.exec(awsBinary, *args, silent = silent)
 
         if (!result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
