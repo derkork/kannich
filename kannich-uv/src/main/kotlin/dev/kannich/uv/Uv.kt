@@ -91,13 +91,23 @@ class Uv(val version: String) : Tool {
     suspend fun exec(vararg args: String) {
         ensureInstalled()
 
-        val homeDir = home()
-        val uvBinary = "$homeDir/uv"
+        val uvBinary = "${home()}/uv"
+
+        // cache for package and wheel downloads
         val uvCacheKey = "$CACHE_KEY/uv-cache"
         Cache.ensureDir(uvCacheKey)
         val uvCachePath = Cache.path(uvCacheKey)
 
-        val result = JobContext.current().withEnv(mapOf("UV_CACHE_DIR" to uvCachePath)) {
+        // cache for python installations
+        val uvPythonInstallKey = "$CACHE_KEY/uv-pythons"
+        Cache.ensureDir(uvPythonInstallKey)
+        val uvPythonInstallPath = Cache.path(uvPythonInstallKey)
+
+        val result = JobContext.current().withEnv(mapOf(
+            "UV_CACHE_DIR" to uvCachePath,
+            "UV_PYTHON_INSTALL_DIR" to uvPythonInstallPath,
+            "UV_LINK_MODE" to "copy",  // use copy because we work on an overlayfs and hardlinks won't work there.
+        )) {
            Shell.exec(uvBinary, *args)
         }
 
