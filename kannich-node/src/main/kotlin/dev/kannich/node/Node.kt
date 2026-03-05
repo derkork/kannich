@@ -79,16 +79,16 @@ class Node(val version: String) : Tool {
         logger.info("Successfully installed Node.js $version.")
     }
 
-    suspend fun exec(vararg args: String, silent: Boolean = false) {
-        run("node", *args, silent = silent)
+    suspend fun exec(vararg args: String, silent: Boolean = false, allowFailure: Boolean = false) : ExecResult {
+       return run("node", *args, silent = silent, allowFailure = allowFailure)
     }
 
-    private suspend fun run(tool: String, vararg args: String, silent: Boolean = false): ExecResult {
+    private suspend fun run(tool: String, vararg args: String, silent: Boolean = false, allowFailure: Boolean = false): ExecResult {
         ensureInstalled()
 
         val binary = "${home()}/bin/$tool"
         val result = Shell.exec(binary, *args, silent = silent)
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")
         }
@@ -106,11 +106,11 @@ class Node(val version: String) : Tool {
     }
 
     class SubTool(private val owner: Node, private val name: String) {
-        suspend fun exec(vararg args: String, silent: Boolean = false): ExecResult {
+        suspend fun exec(vararg args: String, silent: Boolean = false, allowFailure: Boolean = false): ExecResult {
             // npm and npx expect the node binary to be in the PATH, so we wrap this with
             // a call to withTools to ensure the node binary is available.
             return JobContext.current().withTools(owner) {
-                owner.run(name, *args, silent = silent)
+                owner.run(name, *args, silent = silent, allowFailure = allowFailure)
             }
         }
     }

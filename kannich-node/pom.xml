@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-node</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>Kannich Node.js Plugin</name>
     <description>Node.js plugin for Kannich - installs Node.js runtime</description>
 
