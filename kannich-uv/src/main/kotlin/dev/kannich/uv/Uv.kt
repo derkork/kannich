@@ -1,5 +1,6 @@
 package dev.kannich.uv
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
@@ -88,7 +89,7 @@ class Uv(val version: String) : Tool {
      *
      * @param args Arguments to pass to `uv`
      */
-    suspend fun exec(vararg args: String) {
+    suspend fun exec(vararg args: String, silent: Boolean = false, allowFailure: Boolean = false) : ExecResult {
         ensureInstalled()
 
         val uvBinary = "${home()}/uv"
@@ -108,13 +109,15 @@ class Uv(val version: String) : Tool {
             "UV_PYTHON_INSTALL_DIR" to uvPythonInstallPath,
             "UV_LINK_MODE" to "copy",  // use copy because we work on an overlayfs and hardlinks won't work there.
         )) {
-           Shell.exec(uvBinary, *args)
+           Shell.exec(uvBinary, *args, silent = silent)
         }
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code:${result.exitCode}" }
             fail("UV command failed: $errorMessage")
         }
+
+        return result
     }
 
     /**
