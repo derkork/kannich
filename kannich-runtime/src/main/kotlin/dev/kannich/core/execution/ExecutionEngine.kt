@@ -208,12 +208,22 @@ class ExecutionEngine(
             return Result.success(Unit)
         }
 
+        val tmpDir = FsUtil.mktemp("artifacts").getOrThrow()
+
         // Log and copy matched artifacts
         for (path in safePaths) {
             logger.info("Matched artifact: $path")
-            FsUtil.copy(workDir.resolve(path), artifactsDir.resolve(path)).getOrElse { return Result.failure(it) }
+
+            val tmpPath = tmpDir.resolve(path)
+            // copy the artifact to a temporary directory first. Copying it directly in a single step would
+            // lead to issues with the underlying file system because it's the same path, but the source layer is
+            // on top of the target layer. So basically, the file would replace itself.
+            FsUtil.copy(workDir.resolve(path), tmpPath).getOrElse { return Result.failure(it) }
+            FsUtil.copy(tmpPath, artifactsDir.resolve(path)).getOrElse { return Result.failure(it) }
         }
 
+        // doesn't matter if this fails, we just want to clean up
+        FsUtil.delete(tmpDir)
         return Result.success(Unit)
     }
 }
