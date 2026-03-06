@@ -1,5 +1,6 @@
 package dev.kannich.precommit
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
@@ -102,7 +103,7 @@ class PreCommit(val version: String) : Tool {
      * @param args Arguments to pass to pre-commit
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    suspend fun exec(vararg args: String) {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -116,13 +117,15 @@ class PreCommit(val version: String) : Tool {
         // Pre-commit uses PRE_COMMIT_HOME environment variable for its cache
         val ctx = JobContext.current()
         val result = ctx.withEnv(mapOf("PRE_COMMIT_HOME" to hooksCachePath)) {
-            Shell.exec(preCommitBinary, *args)
+            Shell.exec(preCommitBinary, *args, silent = silent)
         }
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Pre-commit command failed: $errorMessage")
         }
+
+        return result
     }
 
     /**

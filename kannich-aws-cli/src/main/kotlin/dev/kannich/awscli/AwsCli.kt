@@ -82,7 +82,7 @@ class AwsCli(val version: String) : Tool {
      *
      * @param args Arguments to pass to `aws`
      */
-    suspend fun exec(vararg args: String, silent: Boolean = false) : ExecResult {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -90,7 +90,7 @@ class AwsCli(val version: String) : Tool {
 
         val result = Shell.exec(awsBinary, *args, silent = silent)
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("AWS CLI command failed: $errorMessage")
         }

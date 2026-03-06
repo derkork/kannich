@@ -31,7 +31,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # GPG for code signing
     gnupg2 \
     # File system utilities for overlay support
-    fuse-overlayfs \
     rsync \
     # Archive handling
     tar \
@@ -53,7 +52,7 @@ COPY --from=jdk-builder /jdk-minimal /kannich/jdk
 ENV KANNICH_JAVA_HOME=/kannich/jdk
 
 # Create Kannich directories
-RUN mkdir -p /kannich/cache /kannich/overlays /workspace
+RUN mkdir -p /kannich/cache /workspace
 
 # Copy Kannich CLI jar
 COPY kannich-cli.jar /kannich/kannich-cli.jar

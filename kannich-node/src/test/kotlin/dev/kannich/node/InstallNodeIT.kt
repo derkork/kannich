@@ -19,7 +19,7 @@ class InstallNodeIT : FunSpec({
             .import("dev.kannich.node.Node")
             .job {
                 """
-                val node = Node("22.14.0")
+                val node = Node("24.14.0")
                 node.exec("--version")
                 node.npm.exec("--version")
                 node.npx.exec("--version")
@@ -29,6 +29,6 @@ class InstallNodeIT : FunSpec({
         val result = executor.run(pipeline)
 
         result.success shouldBe true
-        result.stdout shouldContain "v22.14.0"
+        result.stdout shouldContain "v24.14.0"
     }
 })

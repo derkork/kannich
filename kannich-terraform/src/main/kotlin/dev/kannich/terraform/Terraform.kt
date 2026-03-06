@@ -85,15 +85,15 @@ class Terraform(val version: String) : Tool {
      *
      * @param args Arguments to pass to Terraform
      */
-    suspend fun exec(vararg args: String) : ExecResult {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
         val terraformBinary = "$homeDir/terraform"
 
-        val result = Shell.exec(terraformBinary, *args)
+        val result = Shell.exec(terraformBinary, *args, silent = silent)
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Terraform command failed: $errorMessage")
         }

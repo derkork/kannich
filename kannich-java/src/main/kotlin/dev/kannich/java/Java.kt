@@ -1,5 +1,6 @@
 package dev.kannich.java
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
@@ -80,16 +81,19 @@ class Java(val version: String) : Tool {
      * @param args Arguments to pass to the java command
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    suspend fun exec(vararg args: String) {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
         val homeDir = home()
         val result = JobContext.current().withEnv(mapOf("JAVA_HOME" to homeDir)) {
-            Shell.exec("$homeDir/bin/java", *args)
+            Shell.exec("$homeDir/bin/java", *args, silent = silent)
         }
-        if (!result.success) {
+
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")
         }
+
+        return result
     }
 
     /**

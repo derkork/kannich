@@ -1,5 +1,6 @@
 package dev.kannich.trivy
 
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.Cache
@@ -95,7 +96,7 @@ class Trivy(val version: String) : Tool {
      *
      * @param args Arguments to pass to Trivy
      */
-    suspend fun exec(vararg args: String) {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean): ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -106,13 +107,14 @@ class Trivy(val version: String) : Tool {
         Cache.ensureDir(dbCacheKey)
         val dbCachePath = Cache.path(dbCacheKey)
 
-        val allArgs = listOf("--cache-dir", dbCachePath) + args.toList()
-        val result = Shell.exec(trivyBinary, *allArgs.toTypedArray())
+        val result = Shell.exec(trivyBinary, "--cache-dir", dbCachePath, *args, silent = silent)
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Trivy command failed: $errorMessage")
         }
+
+        return result
     }
 
 

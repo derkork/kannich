@@ -11,4 +11,7 @@ interface Tool {
      * Ensures that the tool is installed and ready to use.
      */
     suspend fun ensureInstalled()
+
+
+    suspend fun exec(vararg args: String, silent:Boolean = false, allowFailure:Boolean = false) : ExecResult
 }

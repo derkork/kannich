@@ -95,6 +95,16 @@ class JobContext(
     }
 
     /**
+     * Changes the given environment variables for the duration of the block.
+     *
+     * @param vars The environment variables to set. If a variable is null, it is removed from the environment.
+     * @param block The block to execute with the new environment.
+     * @return The result of the block.
+     */
+    suspend fun withEnv(vararg vars: Pair<String, String?>, block: suspend () -> Unit) =
+        withEnv(vars.toMap(), block)
+
+    /**
      * Changes the environment PATH variable to include the given tools' paths for the duration of the block.
      *
      * @param tools The tools to include in the PATH variable
@@ -103,7 +113,13 @@ class JobContext(
      */
     suspend fun <T> withTools(vararg tools: Tool, block: suspend () -> T): T {
         val path = env["PATH"]
-        val toolsPath = tools.flatMap { it.getToolPaths() }.joinToString(":")
+        val toolsPath = tools
+            .flatMap {
+                it.ensureInstalled()
+                it.getToolPaths()
+            }
+            .joinToString(":")
+
         val finalPath = when (path) {
             null -> toolsPath
             else -> "$toolsPath:$path"

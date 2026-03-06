@@ -89,7 +89,7 @@ class Uv(val version: String) : Tool {
      *
      * @param args Arguments to pass to `uv`
      */
-    suspend fun exec(vararg args: String, silent: Boolean = false, allowFailure: Boolean = false) : ExecResult {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
         val uvBinary = "${home()}/uv"

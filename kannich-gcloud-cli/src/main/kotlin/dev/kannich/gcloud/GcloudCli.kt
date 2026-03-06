@@ -82,7 +82,7 @@ class GcloudCli(val version: String) : Tool {
      *
      * @param args Arguments to pass to `gcloud`
      */
-    suspend fun exec(vararg args: String) : ExecResult {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean): ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -90,7 +90,7 @@ class GcloudCli(val version: String) : Tool {
 
         val result = Shell.exec(gcloudBinary, *args)
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("gcloud CLI command failed: $errorMessage")
         }

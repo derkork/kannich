@@ -62,32 +62,30 @@ class Node(val version: String) : Tool {
         Cache.ensureDir(CACHE_KEY)
 
         // Create version-specific directory
-        val nodeDir = Cache.path(cacheKey)
-        Fs.mkdir(nodeDir)
+        val nodeRootDir = Cache.path(CACHE_KEY)
+        val nodeVersionedDir = Cache.path(cacheKey)
 
         // Download and extract Node.js.
         // The archive contains a directory like 'node-v22.14.0-linux-x64'
         val downloadUrl = getDownloadUrl(version)
         val archive = Web.download(downloadUrl)
-        val tempDir = Fs.mktemp()
-        Compressor.extract(archive, tempDir)
+        Compressor.extract(archive, nodeRootDir)
 
         // The archive structure is node-v{version}-linux-x64/bin/node
-        val folder = Fs.glob("node-v$version-linux-x64*", tempDir, kind = FsKind.Folder).first()
-        Fs.move("$tempDir/$folder", nodeDir)
-        Fs.delete(tempDir)
+        val folder = Fs.glob("node-v$version-linux-x64*", nodeRootDir, kind = FsKind.Folder).first()
+        Fs.move("$nodeRootDir/$folder", nodeVersionedDir)
         logger.info("Successfully installed Node.js $version.")
     }
 
-    suspend fun exec(vararg args: String, silent: Boolean = false, allowFailure: Boolean = false) : ExecResult {
-       return run("node", *args, silent = silent, allowFailure = allowFailure)
-    }
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) =
+        run("node", *args, silent = silent, allowFailure = allowFailure)
 
-    private suspend fun run(tool: String, vararg args: String, silent: Boolean = false, allowFailure: Boolean = false): ExecResult {
+    private suspend fun run(tool: String, vararg args: String, silent: Boolean, allowFailure: Boolean): ExecResult {
         ensureInstalled()
 
         val binary = "${home()}/bin/$tool"
         val result = Shell.exec(binary, *args, silent = silent)
+
         if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")

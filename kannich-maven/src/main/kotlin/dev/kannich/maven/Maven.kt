@@ -1,6 +1,7 @@
 package dev.kannich.maven
 
 import dev.kannich.java.Java
+import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.FsUtil
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.KannichDsl
@@ -158,7 +159,7 @@ class Maven(
      * @param args Arguments to pass to Maven
      * @throws dev.kannich.stdlib.JobFailedException if the command fails
      */
-    suspend fun exec(vararg args: String) {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
         val homeDir = home()
@@ -193,13 +194,15 @@ class Maven(
         )
 
         val result = JobContext.current().withEnv(env) {
-            Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray())
+            Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), silent = silent)
         }
 
-        if (!result.success) {
+        if (!allowFailure && !result.success) {
             val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
             fail("Command failed: $errorMessage")
         }
+
+        return result
     }
 
     /**

@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-06
+### Added
+- `withEnv` has an overload now that takes pairs of names and values, so its not necessary to wrap them into a map anymore.
+- `Tool` now has a standardized `exec` method that allows to run the tool silently and control whether the build should fail if the tool call fails.
+
+### Fixed
+- `withTools` now ensures that the tool is actually installed.
+
+
 ## [0.7.0] - 2026-02-25
 ### Changed
 - Update parent pom version.

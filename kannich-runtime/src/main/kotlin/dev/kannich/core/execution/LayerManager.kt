@@ -23,11 +23,16 @@ object LayerManager {
     private val logger: Logger = LoggerFactory.getLogger(LayerManager::class.java)
 
     /**
-     * Creates a job layer for isolation. Uses fuse-overlayfs to avoid having to copy all workspace files into the layer.
+     * Creates a job layer for isolation. Uses overlayfs to avoid having to copy all workspace files into the layer.
      *
      * @param parentLayerId Optional parent layer to base on. If null, uses /workspace.
      */
     fun createJobLayer(parentLayerId: String? = null): Result<String> {
+        if (!FsUtil.exists(Path.of("/kannich/overlays")).getOrElse { return Result.failure(it) }) {
+            ProcessUtil.execShell("mkdir -p /kannich/overlays", silent = true).getOrElse { return Result.failure(it) }
+            ProcessUtil.execShell("mount -t tmpfs tmpfs /kannich/overlays", silent = true).getOrElse { return Result.failure(it) }
+        }
+
         val layerId = "layer-${UUID.randomUUID().toString().replace("-", "")}"
         val layerDir = "/kannich/overlays/$layerId"
         val lowerDir = if (parentLayerId != null) {
@@ -43,9 +48,10 @@ object LayerManager {
         FsUtil.mkdir(Path.of(layerDir, "work")).getOrElse { return Result.failure(it) }
         FsUtil.mkdir(Path.of(layerDir, "merged")).getOrElse { return Result.failure(it) }
 
-        // Mount fuse-overlayfs
+        // Mount overlayfs
         val mountResult = ProcessUtil.execShell(
-            command = "fuse-overlayfs -o lowerdir=$lowerDir,upperdir=$layerDir/upper,workdir=$layerDir/work $layerDir/merged",
+            // disable index and metacopy options to avoid issues with stale inodes
+            command = "mount -t overlay overlay -o index=off,metacopy=off,lowerdir=$lowerDir,upperdir=$layerDir/upper,workdir=$layerDir/work $layerDir/merged",
             silent = true
         )
 
@@ -184,9 +190,8 @@ object LayerManager {
     fun removeJobLayer(layerId: String) :Result<Unit>  {
         val layerDir = "/kannich/overlays/$layerId"
 
-        // Unmount overlayfs first (fusermount -u for fuse-overlayfs)
-        // Use -z (lazy) to detach immediately even if busy - cleanup happens when no longer in use
-        val unmountResult = ProcessUtil.execShell("fusermount -uz $layerDir/merged", silent = true).getOrElse { return Result.failure(it) }
+        // Unmount overlayfs first
+        val unmountResult = ProcessUtil.execShell("umount $layerDir/merged", silent = true).getOrElse { return Result.failure(it) }
 
         if (!unmountResult.success) {
             logger.warn("Failed to unmount layer $layerId: ${unmountResult.stderr}")
