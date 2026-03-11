@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-quarkus</artifactId>
-    <version>0.3.0</version>
+    <version>0.3.1</version>
     <name>Kannich Quarkus Plugin</name>
     <description>Quarkus plugin for Kannich - Quarkus build support</description>
 
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-maven</artifactId>
-            <version>0.8.0</version>
+            <version>0.10.0</version>
         </dependency>
 
         <dependency>
