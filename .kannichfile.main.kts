@@ -15,7 +15,7 @@ import dev.kannich.helm.Helm
 
 pipeline {
     val java = Java("21")
-    val trivy = Trivy("0.68.2")
+    val trivy = Trivy("0.69.3")
 
     suspend fun envToggle(name: String, defaultValue: Boolean = false): Boolean {
         return "true" == (getEnv(name) ?: "$defaultValue")
@@ -38,7 +38,7 @@ pipeline {
                 }
             }
 
-            maven.exec("-B", "-q", "install", "-DskipTests")
+            maven.exec("-B", "-q", "clean", "install", "-DskipTests")
 
             log("Publishing to Maven Central")
             withEnv(mapOf("MAVEN_GPG_PASSPHRASE" to gpgPassphrase)) {
@@ -71,7 +71,7 @@ pipeline {
             // build cli jar and docker image
             log("Building jar and docker image")
             Docker.enable()
-            maven.exec("-B", "-q", "-Pbootstrap", "install", "-DskipTests")
+            maven.exec("-B", "-q", "-Pbootstrap", "clean", "install", "-DskipTests")
 
             val imageVersion = cd("kannich-builder-image") {
                 maven.getProjectVersion()
