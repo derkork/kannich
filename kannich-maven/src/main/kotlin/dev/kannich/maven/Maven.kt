@@ -1,17 +1,8 @@
 package dev.kannich.maven
 
 import dev.kannich.java.Java
-import dev.kannich.stdlib.ExecResult
-import dev.kannich.stdlib.FsUtil
-import dev.kannich.stdlib.JobContext
-import dev.kannich.stdlib.KannichDsl
-import dev.kannich.stdlib.Tool
-import dev.kannich.stdlib.fail
-import dev.kannich.tools.Compressor
-import dev.kannich.tools.Shell
-import dev.kannich.tools.Cache
-import dev.kannich.tools.Fs
-import dev.kannich.tools.Web
+import dev.kannich.stdlib.*
+import dev.kannich.tools.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -55,7 +46,7 @@ class MavenBuilder {
      * @param id The server id
      * @param block Configuration block for the server
      */
-    suspend fun server(id: String, block: suspend ServerBuilder.() -> Unit) {
+    fun server(id: String, block: ServerBuilder.() -> Unit) {
         val builder = ServerBuilder(id)
         builder.block()
         servers.add(builder.build())
@@ -82,10 +73,12 @@ class MavenBuilder {
  * ```kotlin
  * pipeline {
  *     val java = Java("21")
+ *     val ciUsername = getenv("CI_USERNAME") ?: ""
+ *     val ciPassword = getenv("CI_PASSWORD") ?: ""
  *     val maven = Maven("3.9.6", java) {
  *         server("ossrh") {
- *             username = getenv("CI_USERNAME") ?: ""
- *             password = getenv("CI_PASSWORD") ?: ""
+ *             username = ciUsername
+ *             password = ciPassword
  *         }
  *     }
  *
@@ -298,9 +291,16 @@ class Maven(
      * Returns the version of the Maven project in the current working directory.
      */
     suspend fun getProjectVersion(): String {
+        return evaluateExpression("project.version")
+    }
+
+    /**
+     * Evaluates an expression in the current Maven project.
+     */
+    suspend fun evaluateExpression(expression: String): String {
         val tempDir = Fs.mktemp()
-        exec("help:evaluate", "-Dexpression=project.version", "-q", "-Doutput=$tempDir/version.txt")
-        return Fs.readAsString("$tempDir/version.txt")
+        exec("help:evaluate", "-Dexpression=$expression", "-q", "-Doutput=$tempDir/result.txt", silent = true)
+        return Fs.readAsString("$tempDir/result.txt")
     }
 
     /**
