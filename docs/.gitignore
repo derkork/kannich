@@ -1,4 +1,2 @@
-vendor
-_site
-Gemfile.lock
-.jekyll-cache
+# Zola build output
+public/

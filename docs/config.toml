@@ -1,0 +1,41 @@
+# The Goyo theme for Zola.
+# https://github.com/hahwul/goyo
+base_url = "https://derkork.github.io/kannich"
+title = "Kannich - The CI pipeline that doesn't suck."
+description = "A simple and powerful way to build CI pipelines that work on your machine and in any CI system."
+default_language = "en"
+theme = "goyo"
+
+build_search_index = true
+generate_feeds = false
+
+[markdown]
+[markdown.highlighting]
+theme = "github-dark"
+
+[extra]
+# Navigation Configuration
+nav = [
+    { name = "Documentation", url = "/docs/", type = "url", icon = "book" },
+    { name = "GitHub", url = "https://github.com/derkork/kannich", type = "url", icon = "github" },
+]
+
+# Footer Configuration
+footer_html = "Powered by <a href='https://www.getzola.org'>Zola</a> and <a href='https://github.com/hahwul/goyo'>Goyo</a>"
+
+# Logo Configuration
+[extra.logo]
+text = "Kannich"
+
+# Theme Configuration
+[extra.theme]
+colorset = "dark"
+brightness = "normal"
+disable_toggle = false
+default_theme_dark = "goyo-dark"
+default_theme_light = "goyo-light"
+
+# Sidebar Configuration
+[extra.sidebar]
+expand_depth = 2
+disable_root_hide = false
