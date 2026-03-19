@@ -1,6 +1,6 @@
 # The Goyo theme for Zola.
 # https://github.com/hahwul/goyo
-base_url = "https://derkork.github.io/kannich"
+base_url = "/"
 title = "Kannich - The CI pipeline that doesn't suck."
 description = "A simple and powerful way to build CI pipelines that work on your machine and in any CI system."
 default_language = "en"
