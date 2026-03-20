@@ -101,7 +101,7 @@ class JobContext(
      * @param block The block to execute with the new environment.
      * @return The result of the block.
      */
-    suspend fun withEnv(vararg vars: Pair<String, String?>, block: suspend () -> Unit) =
+    suspend fun <T> withEnv(vararg vars: Pair<String, String?>, block: suspend () -> T): T =
         withEnv(vars.toMap(), block)
 
     /**
