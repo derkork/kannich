@@ -1,9 +1,9 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.5.0")
-@file:DependsOn("dev.kannich:kannich-tools:0.5.0")
-@file:DependsOn("dev.kannich:kannich-maven:0.5.0")
-@file:DependsOn("dev.kannich:kannich-java:0.5.0")
-@file:DependsOn("dev.kannich:kannich-trivy:0.5.0")
-@file:DependsOn("dev.kannich:kannich-helm:0.5.0")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.8.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.8.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.11.0")
+@file:DependsOn("dev.kannich:kannich-java:0.8.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.8.0")
+@file:DependsOn("dev.kannich:kannich-helm:0.8.0")
 
 
 import dev.kannich.java.Java
@@ -21,22 +21,26 @@ pipeline {
         return "true" == (getEnv(name) ?: "$defaultValue")
     }
 
+    suspend fun setupMavenForDeployment():Maven {
+        val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
+        val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
+        return Maven("3.9.6", java) {
+            server("ossrh") {
+                username = sonatypeUsername
+                password = sonatypePassword
+            }
+        }
+    }
+
     execution("release-module", "Description releases a single module") {
         job {
             val gpgKey = requireEnv("KANNICH_GPG_KEY")
             val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
-            val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
-            val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
             val moduleName = requireEnv("KANNICH_MODULE")
 
             Gpg.importKey(gpgKey)
 
-            val maven = Maven("3.9.6", java) {
-                server("ossrh") {
-                    username = sonatypeUsername
-                    password = sonatypePassword
-                }
-            }
+            val maven = setupMavenForDeployment()
 
             maven.exec("-B", "-q", "clean", "install", "-DskipTests")
 
@@ -53,18 +57,11 @@ pipeline {
             val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
             val gpgKey = requireEnv("KANNICH_GPG_KEY")
             val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
-            val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
-            val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
 
             val setLatest = envToggle("KANNICH_SET_LATEST", true)
             val dryRun = envToggle("KANNICH_DRY_RUN")
 
-            val maven = Maven("3.9.6", java) {
-                server("ossrh") {
-                    username = sonatypeUsername
-                    password = sonatypePassword
-                }
-            }
+            val maven = setupMavenForDeployment()
 
             Gpg.importKey(gpgKey)
 
@@ -183,6 +180,40 @@ pipeline {
             val currentFolder = Fs.resolve("")
             Docker.exec("run", "-v", "$currentFolder:/data", "alpine", "cat", "/data/test.txt")
 
+        }
+    }
+
+    execution("update-docs-versions", "Extracts module versions and updates documentation") {
+        job {
+            val maven = Maven("3.9.6", java)
+
+            // Find all module directories
+            val modulePoms = Fs.glob("*/pom.xml")
+            val versions = mutableMapOf<String, String>()
+
+            for (pomPath in modulePoms) {
+                val moduleDir = pomPath.substringBeforeLast("/pom.xml")
+
+                // Skip modules not used as direct dependencies
+                if (moduleDir in listOf("kannich-builder-image", "kannich-runtime", "kannich-cli")) continue
+
+                cd(moduleDir) {
+                    val artifactId = maven.evaluateExpression("project.artifactId")
+                    val version = maven.evaluateExpression("project.version")
+                    log("Found module: $artifactId = $version")
+                    versions[artifactId] = version
+                }
+
+            }
+
+            // Generate JSON file for documentation
+            val json = "{${versions.entries.toList().sortedBy { it.key }.joinToString { "\"${it.key}\": \"${it.value}\"" }}}"
+
+            Fs.write("docs/static/versions.json", json)
+
+            artifacts {
+                includes("docs/static/versions.json")
+            }
         }
     }
 }

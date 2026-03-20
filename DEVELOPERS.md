@@ -241,6 +241,35 @@ mvn install -DskipTests && mvn verify -Pintegration-tests -Dsurefire.skip=true
 mvn install -DskipTests && mvn verify -Pintegration-tests
 ```
 
+### Working with Documentation
+
+The documentation site uses [Zola](https://www.getzola.org/) with the [Goyo theme](https://github.com/hahwul/goyo) and is located in the `docs/` directory.
+
+**Option 1: Using Docker** (no local Zola installation needed)
+```bash
+cd docs
+docker-compose up
+# Site available at http://localhost:4000
+# Note: File watching doesn't work through Docker on Windows
+# After editing files, run: docker-compose restart
+```
+
+**Option 2: Using Zola locally** (recommended for active documentation work)
+```bash
+# Install Zola: https://www.getzola.org/documentation/getting-started/installation/
+cd docs
+zola serve
+# Site available at http://127.0.0.1:1111 with live reload
+```
+
+**Quick restart alias for Docker workflow:**
+```bash
+alias zr="cd docs && docker-compose restart && cd .."
+```
+
+**Deployment:**
+Documentation is automatically deployed to GitHub Pages when changes are pushed to `main`. The workflow is defined in `.github/workflows/deploy-docs.yml`.
+
 ### Key Technical Decisions
 
 | Area | Choice | Why |

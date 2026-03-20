@@ -22,7 +22,7 @@ Kannich is designed to complement existing CI/CD platforms like GitHub Actions, 
 - **Smart Tooling**: Automatically downloads, installs, and caches tools (like Java, Maven, Docker, etc.) on first use.
 - **Parallel & Sequential Execution**: Fine-grained control over job orchestration and execution flow.
 - **Artifact Management**: Declarative artifact collection that automatically syncs files from the build container back to your workspace.
-- **Efficient Caching**: Supports caching of dependencies and build results to speed up subsequent executions.
+- **Build Caching**: Supports caching of dependencies and build results.
 
 ## A Sample Pipeline
 
