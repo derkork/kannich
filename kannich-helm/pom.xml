@@ -7,12 +7,12 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.8.0</version>
+        <version>0.9.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-helm</artifactId>
-    <version>0.8.0</version>
+    <version>0.9.0</version>
     <name>Kannich Helm Plugin</name>
     <description>Helm plugin for Kannich - Kubernetes package manager</description>
 
@@ -36,12 +36,10 @@
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-runner-junit5-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 

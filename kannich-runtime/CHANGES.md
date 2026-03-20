@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-20
+### Changed
+- Bumped the `kannich-parent` dependency to `0.9.0`.
+- Removed unnecessary dependencies slowing down module loading.
+- Added caching for script compilation to speed up later builds.
+
 ## [0.8.0] - 2026-03-06
 ### Changed
 - Overlays are now mounted with kernel mode overlayfs rather than fuse-overlayfs. This solves issues with executables being unable to be launched from overlay folders. In addition it improves performance.

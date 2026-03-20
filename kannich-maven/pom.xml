@@ -7,17 +7,17 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.8.0</version>
+        <version>0.9.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-maven</artifactId>
-    <version>0.11.0</version>
+    <version>0.12.0</version>
     <name>Kannich Maven Plugin</name>
     <description>Maven plugin for Kannich - Maven build support</description>
 
     <properties>
-        <kannich.test.image>derkork/kannich:0.8.0-0.8.0</kannich.test.image>
+        <kannich.test.image>derkork/kannich:0.9.0-0.9.0</kannich.test.image>
     </properties>
 
     <dependencies>
@@ -35,7 +35,7 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-java</artifactId>
-            <version>0.8.0</version>
+            <version>0.9.0</version>
         </dependency>
 
         <dependency>
@@ -47,18 +47,15 @@
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-runner-junit5-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-test</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 

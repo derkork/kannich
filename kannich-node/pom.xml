@@ -7,17 +7,17 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.8.0</version>
+        <version>0.9.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-node</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
     <name>Kannich Node.js Plugin</name>
     <description>Node.js plugin for Kannich - installs Node.js runtime</description>
 
     <properties>
-        <kannich.test.image>derkork/kannich:0.8.0-0.8.0</kannich.test.image>
+        <kannich.test.image>derkork/kannich:0.9.0-0.9.0</kannich.test.image>
     </properties>
 
     <dependencies>
@@ -42,17 +42,14 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-test</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-runner-junit5-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.kotest</groupId>
             <artifactId>kotest-assertions-core-jvm</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
