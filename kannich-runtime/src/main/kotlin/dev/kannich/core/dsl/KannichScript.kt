@@ -1,5 +1,6 @@
 package dev.kannich.core.dsl
 
+import dev.kannich.stdlib.Kannich
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.dependencies.CompoundDependenciesResolver
@@ -13,6 +14,11 @@ import kotlin.script.experimental.jvm.dependenciesFromCurrentContext
 import kotlin.script.experimental.jvm.jvm
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.security.MessageDigest
+import kotlin.script.experimental.host.ScriptingHostConfiguration
+import kotlin.script.experimental.jvm.compilationCache
+import kotlin.script.experimental.jvmhost.CompiledScriptJarsCache
 
 /**
  * Defines .kannichfile.main.kts as a Kotlin script with Maven dependency support.
@@ -44,7 +50,32 @@ object KannichScriptCompilationConfiguration : ScriptCompilationConfiguration({
     refineConfiguration {
         onAnnotations(DependsOn::class, Repository::class, handler = ::configureMavenDepsOnAnnotations)
     }
+
+    hostConfiguration(ScriptingHostConfiguration {
+        jvm {
+            val cacheBaseDir = File(Kannich.CACHE_DIR + "/scripts")
+            cacheBaseDir.mkdirs()
+            compilationCache(
+                CompiledScriptJarsCache { script, scriptCompilationConfiguration ->
+                    File(cacheBaseDir, compiledScriptUniqueName(script, scriptCompilationConfiguration) + ".jar")
+                }
+            )
+        }
+    })
 })
+
+@OptIn(ExperimentalStdlibApi::class)
+private fun compiledScriptUniqueName(script: SourceCode, scriptCompilationConfiguration: ScriptCompilationConfiguration): String {
+    val digestWrapper = MessageDigest.getInstance("MD5")
+    digestWrapper.update(script.text.toByteArray())
+    scriptCompilationConfiguration.notTransientData.entries
+        .sortedBy { it.key.name }
+        .forEach {
+            digestWrapper.update(it.key.name.toByteArray())
+            digestWrapper.update(it.value.toString().toByteArray())
+        }
+    return digestWrapper.digest().toHexString()
+}
 
 object KannichScriptEvaluationConfiguration : ScriptEvaluationConfiguration({})
 
