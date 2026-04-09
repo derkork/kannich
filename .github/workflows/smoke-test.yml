@@ -13,7 +13,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Cache Kannich dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.kannich-cache
+          key: kannich-${{ runner.os }}-${{ hashFiles('.kannichfile.main.kts') }}
+          restore-keys: |
+            kannich-${{ runner.os }}-
+
       - name: Run smoke test
         run: ./kannichw smoke-test
         env:
           KANNICH_IMAGE: derkork/kannich@sha256:0f2b3814b8aa71eb1acfefe445a08f73ed415209e34648d561b47c974f7069d7
+          KANNICH_CACHE_DIR: ~/.kannich-cache
