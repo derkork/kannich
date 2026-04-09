@@ -9,11 +9,12 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    env:
-      KANNICH_CACHE_DIR: ${{ env.HOME }}/.kannich-cache
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set cache directory
+        run: echo "KANNICH_CACHE_DIR=$HOME/.kannich-cache" >> $GITHUB_ENV
 
       - name: Cache Kannich dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
