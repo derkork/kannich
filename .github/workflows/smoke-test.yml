@@ -1,0 +1,19 @@
+name: Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run smoke test
+        run: ./kannichw smoke-test
+        env:
+          KANNICH_IMAGE: derkork/kannich:0.8.0
