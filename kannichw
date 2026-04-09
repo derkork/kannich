@@ -127,13 +127,3 @@ docker run --rm \
     -w /workspace \
     "$KANNICH_IMAGE" \
     "$@"
-
-# Fix ownership of the cache dir if it was bind-mounted. Files written inside the container
-# are owned by root; run a chown inside a container (where we have root) rather than
-# requiring sudo on the host.
-if [ -n "$KANNICH_CACHE_DIR" ]; then
-    docker run --rm \
-        -v "$KANNICH_CACHE_DIR:/kannich-fix-perms" \
-        "$KANNICH_IMAGE" \
-        chown -R "$(id -u):$(id -g)" /kannich-fix-perms
-fi
