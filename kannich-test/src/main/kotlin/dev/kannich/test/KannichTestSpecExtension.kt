@@ -1,6 +1,6 @@
 package dev.kannich.test
 
-import com.github.dockerjava.api.exception.NotFoundException
+import com.github.dockerjava.api.model.ContainerNetwork
 import io.kotest.core.extensions.MountableExtension
 import io.kotest.core.listeners.AfterSpecListener
 import io.kotest.core.spec.Spec
@@ -19,7 +19,7 @@ class KannichTestSpecExtension : MountableExtension<Unit, GenericContainer<*>>, 
     private val logger = LoggerFactory.getLogger(KannichTestSpecExtension::class.java)
     private var kannichContainer: GenericContainer<*>? = null
     private var squidContainer: GenericContainer<*>? = null
-    private var network: Network? = null
+    private var internalNetwork: Network? = null
 
     /**
      * Path to the local Maven repository. Used to mount into the container
@@ -30,61 +30,43 @@ class KannichTestSpecExtension : MountableExtension<Unit, GenericContainer<*>>, 
             ?: "${System.getProperty("user.home")}/.m2/repository"
     }
 
-    /**
-     * Name of the Docker volume for the download cache.
-     */
-    private val DOWNLOAD_CACHE_VOLUME = "kannich-download-cache"
-
-    /**
-     * Ensures the download cache volume exists, creating it if necessary.
-     */
-    private fun ensureDownloadCacheVolume() {
-        val dockerClient = GenericContainer(DockerImageName.parse("alpine:latest"))
-            .also { it.start() }
-            .dockerClient
-
-        try {
-            dockerClient.inspectVolumeCmd(DOWNLOAD_CACHE_VOLUME).exec()
-            logger.info("Using existing download cache volume: $DOWNLOAD_CACHE_VOLUME")
-        } catch (e: NotFoundException) {
-            dockerClient.createVolumeCmd()
-                .withName(DOWNLOAD_CACHE_VOLUME)
-                .exec()
-            logger.info("Created new download cache volume: $DOWNLOAD_CACHE_VOLUME")
-        }
-    }
-
-    /**
-     * Creates a kannich container extension for use with Kotest.
-     * Automatically mounts the local Maven repository for access to locally installed artifacts.
-     * Mounts a persistent download cache volume to speed up repeated downloads across test runs.
-     */
     override fun mount(configure: Unit.() -> Unit): GenericContainer<*> {
-        val image = System.getProperty("kannich.test.image") ?: throw IllegalArgumentException("kannich.test.image system property must be set")
+        val image = System.getProperty("kannich.test.image")
+            ?: throw IllegalArgumentException("kannich.test.image system property must be set")
         logger.info("Creating kannich container with image: $image")
         logger.info("Mounting local Maven repository: $M2_REPOSITORY")
-        ensureDownloadCacheVolume()
 
-        val network = Network.newNetwork()
+        // Kannich lives on this network only — no direct internet access, must go through Squid.
+        internalNetwork = Network.builder()
+            .createNetworkCmdModifier { it.withInternal(true) }
+            .build()
 
+        // Squid starts on the default bridge so it has internet access.
         squidContainer = GenericContainer(DockerImageName.parse("ubuntu/squid:latest"))
-            .withNetwork(network)
-            .withNetworkAliases("squid-proxy")
-            .withCreateContainerCmdModifier { cmd ->
-                val volumeBind = com.github.dockerjava.api.model.Bind(
-                    DOWNLOAD_CACHE_VOLUME,
-                    com.github.dockerjava.api.model.Volume("/var/spool/squid")
-                )
-                cmd.hostConfig?.withBinds(volumeBind)
-            }
+            .withExposedPorts(3128)
+            .waitingFor(Wait.forListeningPort())
             .withLogConsumer(Slf4jLogConsumer(logger))
 
         squidContainer!!.start()
 
+        // Connect Squid to the internal network so kannich can reach it.
+        squidContainer!!.dockerClient
+            .connectToNetworkCmd()
+            .withContainerId(squidContainer!!.containerId)
+            .withNetworkId(internalNetwork!!.id)
+            .withContainerNetwork(ContainerNetwork().withAliases(listOf("squid-proxy")))
+            .exec()
+
         kannichContainer = GenericContainer(image)
             .withPrivilegedMode(true)
-            .withNetwork(network)
+            .withNetwork(internalNetwork)
             .withFileSystemBind(M2_REPOSITORY, "/kannich/cache/kannich-deps", BindMode.READ_WRITE)
+            .withEnv("HTTP_PROXY", "http://squid-proxy:3128")
+            .withEnv("HTTPS_PROXY", "http://squid-proxy:3128")
+            .withEnv("http_proxy", "http://squid-proxy:3128")
+            .withEnv("https_proxy", "http://squid-proxy:3128")
+            .withEnv("NO_PROXY", "localhost,127.0.0.1")
+            .withEnv("no_proxy", "localhost,127.0.0.1")
             .withCreateContainerCmdModifier { cmd ->
                 cmd.withEntrypoint("bash", "-c")
                 cmd.withCmd("exec sleep infinity")
@@ -100,7 +82,7 @@ class KannichTestSpecExtension : MountableExtension<Unit, GenericContainer<*>>, 
         runInterruptible(Dispatchers.IO) {
             kannichContainer?.stop()
             squidContainer?.stop()
-            network?.close()
+            internalNetwork?.close()
         }
     }
 }
