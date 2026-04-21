@@ -31,6 +31,8 @@
         <module>kannich-gcloud-cli</module>
         <module>kannich-uv</module>
         <module>kannich-node</module>
+        <module>kannich-rust</module>
+        <module>kannich-zig</module>
     </modules>
 
     <licenses>
