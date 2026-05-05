@@ -18,6 +18,10 @@ if ($env:KANNICH_DOCKER_PROXY_PREFIX) {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = if ($env:KANNICH_PROJECT_DIR) { $env:KANNICH_PROJECT_DIR } else { $ScriptDir }
 
+# KANNICH_PROJECT_DIR is used inside the container to find the workspace. When using the wrapper,
+# it is always /workspace.
+$env:KANNICH_PROJECT_DIR = "/workspace"
+
 # Check for Docker
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Write-Error "Error: Docker not found. Please install Docker."
@@ -59,6 +63,11 @@ if ($env:KANNICH_CACHE_DIR) {
     }
     $CacheMount = "kannich-cache:/kannich/cache"
 }
+
+# in either case, when run through the wrapper KANNICH_CACHE_DIR inside of the container
+# is always /kannich/cache. We set this here because the environment variable later goes
+# into the container and is picked up there.
+$env:KANNICH_CACHE_DIR = "/kannich/cache"
 
 # Detect --dev-mode / -d flag
 $DevMode = $false

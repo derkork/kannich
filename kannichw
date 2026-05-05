@@ -17,7 +17,11 @@ fi
 
 # Determine project directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-KANNICH_PROJECT_DIR="${KANNICH_PROJECT_DIR:-$SCRIPT_DIR}"
+PROJECT_DIR="${KANNICH_PROJECT_DIR:-$SCRIPT_DIR}"
+
+# KANNICH_PROJECT_DIR is used inside the container to find the workspace. When using the wrapper,
+# it is always /workspace.
+export KANNICH_PROJECT_DIR=/workspace
 
 # Check for Docker
 if ! command -v docker >/dev/null 2>&1; then
@@ -57,6 +61,11 @@ else
     fi
     CACHE_MOUNT="kannich-cache:/kannich/cache"
 fi
+
+# in either case, when run through the wrapper KANNICH_CACHE_DIR inside of the container
+# is always /kannich/cache. We set this here because the environment variable later goes
+# into the container and is picked up there.
+export KANNICH_CACHE_DIR=/kannich/cache
 
 # Detect --dev-mode / -d flag
 DEV_MODE=0
@@ -104,7 +113,7 @@ fi
 
 # Put all environment variables into a file named ".kannich_current_env"
 # Use null bytes as delimiters to handle multiline values unambiguously
-awk 'BEGIN { for (name in ENVIRON) printf "%s=%s%c", name, ENVIRON[name], 0 }' > "$KANNICH_PROJECT_DIR/.kannich_current_env"
+awk 'BEGIN { for (name in ENVIRON) printf "%s=%s%c", name, ENVIRON[name], 0 }' > "$PROJECT_DIR/.kannich_current_env"
 
 # Cleanup function
 cleanup() {
@@ -121,7 +130,7 @@ docker run --rm \
     --name "$CONTAINER_NAME" \
     --privileged \
     $TTY_FLAG \
-    -v "$KANNICH_PROJECT_DIR:/workspace" \
+    -v "$PROJECT_DIR:/workspace" \
     -v "$CACHE_MOUNT" \
     $DEV_MODE_MOUNT \
     -w /workspace \
