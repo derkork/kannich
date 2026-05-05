@@ -1,4 +1,8 @@
-## Kannich workflow
++++
+title = "Kannich Workflow"
+weight = 3
++++
+
 
 This page describes what happens, when you run a Kannich workflow through `kannichw`.
 
@@ -13,7 +17,7 @@ This page describes what happens, when you run a Kannich workflow through `kanni
 - If `KANNICH_BOOTSTRAP_SETTINGS_XML` is not set, the wrapper script tries to loadd the user's Maven `setting.xml` file into `KANNICH_BOOTSTRAP_SETTINGS_XML`, if the file exists.
 - The wrapper script reads all environment variables into a file `.kannich_current_env`. Variables are written as key-value pairs, `name=value` seperated by a zero byte.
 - The wrapper script runs the docker container.
-  - The directory where the wrapper script is located is mounted into the container at `/workspace`. If `PROJECT_DIR` is set, the directory indicated by `PROJECT_DIR` is mounted into the container at `/workspace`.
+  - The directory where the wrapper script is located is mounted into the container at `/workspace`. If `KANNICH_PROJECT_DIR` is set, the directory indicated by `KANNICH_PROJECT_DIR` is mounted into the container at `/workspace`.
   - If the `-d` flag is set (dev mode), the user's local maven repository is mounted into the container at `/kannich/dev-repo`.
   - If `KANNICH_CACHE_DIR` is set, the directory indicated by `KANNICH_CACHE_DIR` is mounted into the container at `/kannich/cache`. Otherwise, the docker volume `kannich-cache` is mounted into the container at `/kannich/cache`.
 - Docker runs the Kannich CLI as entrypoint.
