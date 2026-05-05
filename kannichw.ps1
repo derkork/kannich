@@ -16,7 +16,7 @@ if ($env:KANNICH_DOCKER_PROXY_PREFIX) {
 
 # Determine project directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = if ($env:PROJECT_DIR) { $env:PROJECT_DIR } else { $ScriptDir }
+$ProjectDir = if ($env:KANNICH_PROJECT_DIR) { $env:KANNICH_PROJECT_DIR } else { $ScriptDir }
 
 # Check for Docker
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
