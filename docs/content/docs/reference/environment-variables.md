@@ -15,3 +15,4 @@ Kannich currently supports the following environment variables to control its be
 | `KANNICH_CACHE_DIR`              | _(docker volume `kannich-cache`)_  | Host directory to use as the build cache. When unset, Kannich creates and uses a Docker volume named `kannich-cache`.           |
 | `KANNICH_BOOTSTRAP_SETTINGS_XML` | contents of `~/.m2/settings.xml`   | Maven `settings.xml` content passed into the build. If not set, Kannich reads `~/.m2/settings.xml` automatically if it exists.  |
 | `KANNICH_PROJECT_DIR`            | directory of the `kannichw` script | Root directory of the project to build. Mounted into the container as `/workspace`.                                             |
+| `KANNICH_DOCKER_OPTS`            | _(none)_                           | Additional arguments passed directly to `docker run`. Useful for platform overrides (e.g. `--platform linux/arm64`) or port forwarding. |

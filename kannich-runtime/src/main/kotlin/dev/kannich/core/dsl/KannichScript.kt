@@ -53,7 +53,7 @@ object KannichScriptCompilationConfiguration : ScriptCompilationConfiguration({
 
     hostConfiguration(ScriptingHostConfiguration {
         jvm {
-            val cacheBaseDir = File(Kannich.CACHE_DIR + "/scripts")
+            val cacheBaseDir = File(Kannich.CacheDir + "/scripts")
             cacheBaseDir.mkdirs()
             compilationCache(
                 CompiledScriptJarsCache { script, scriptCompilationConfiguration ->

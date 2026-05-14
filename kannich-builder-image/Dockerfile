@@ -16,7 +16,7 @@ FROM cruizba/ubuntu-dind:noble-29.1.3
 
 LABEL org.opencontainers.image.title="Kannich Builder"
 LABEL org.opencontainers.image.description="Base image for Kannich CI builds"
-LABEL org.opencontainers.image.source="https://github.com/kannich/kannich"
+LABEL org.opencontainers.image.source="https://github.com/derkork/kannich"
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Archive handling
     tar \
     gzip \
+    bzip2 \
+    xz-utils \
     unzip \
     zip \
     # Text processing

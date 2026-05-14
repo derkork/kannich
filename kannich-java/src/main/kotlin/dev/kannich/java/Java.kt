@@ -8,8 +8,9 @@ import dev.kannich.tools.Compressor
 import dev.kannich.tools.Fs
 import dev.kannich.tools.Shell
 import dev.kannich.tools.Web
-import dev.kannich.stdlib.FsKind
+import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.Tool
+import dev.kannich.tools.ArchiveToolInstaller
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -27,85 +28,28 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Java(val version: String) : Tool {
-    private val logger: Logger = LoggerFactory.getLogger(Java::class.java)
+class Java(version: String) : ArchiveToolInstaller("java", version, archiveStripComponents = 1) {
+    @Deprecated("Use getInstallPath() instead", ReplaceWith("getInstallPath()"), DeprecationLevel.WARNING)
+    suspend fun home(): String = getInstallPath()
 
-    companion object {
-        private const val CACHE_KEY = "java"
-    }
+    override fun getMainExecutable(): String = "bin/java"
 
-    /**
-     * Gets the Java home directory path inside the container.
-     */
-    suspend fun home(): String =
-        Cache.path("$CACHE_KEY/temurin-$version")
-
-
-    override suspend fun getToolPaths() = listOf("${home()}/bin")
-
-    /**
-     * Ensures Java is installed in the Cache.
-     * Downloads from Adoptium (Eclipse Temurin) if not already present.
-     */
-    override suspend fun ensureInstalled() {
-        val cacheKey = "$CACHE_KEY/temurin-$version"
-
-        if (Cache.exists(cacheKey)) {
-            logger.debug("Java $version is already installed.")
-            return
-        }
-
-        logger.info("Java $version is not installed, downloading.")
-
-        // Ensure java cache directory exists
-        Cache.ensureDir(CACHE_KEY)
-
-        // Download and extract Java to the java cache directory
-        // Using Eclipse Temurin (Adoptium) for reliable downloads
-        val downloadUrl = getDownloadUrl(version)
-        val javaDir = Cache.path(CACHE_KEY)
-        val archive = Web.download(downloadUrl, "java.tar.gz")
-        Compressor.extract(archive, javaDir)
-
-        // Adoptium extracts to directories like "jdk-21.0.5+11", rename to our expected name
-        val folder = Fs.glob("jdk-${version}*", javaDir, kind = FsKind.Folder).first()
-        Fs.move("$javaDir/$folder", Cache.path(cacheKey))
-
-        logger.info("Successfully installed Java $version.")
-    }
-
-    /**
-     * Executes the Java command with the given arguments.
-     * Throws JobFailedException if the execution fails.
-     *
-     * @param args Arguments to pass to the java command
-     * @throws dev.kannich.stdlib.JobFailedException if the command fails
-     */
     override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
-        ensureInstalled()
-        val homeDir = home()
-        val result = JobContext.current().withEnv(mapOf("JAVA_HOME" to homeDir)) {
-            Shell.exec("$homeDir/bin/java", *args, silent = silent)
+        val homeDir = getInstallPath()
+        // ensure JAVA_HOME is set when running the command
+        return JobContext.current().withEnv(mapOf("JAVA_HOME" to homeDir)) {
+            super.exec(*args, silent = silent, allowFailure = allowFailure)
         }
 
-        if (!allowFailure && !result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
-            fail("Command failed: $errorMessage")
-        }
-
-        return result
     }
 
-    /**
-     * Gets the download URL for the specified Java version.
-     * Uses Eclipse Temurin (Adoptium) releases.
-     */
-    private fun getDownloadUrl(version: String): String {
-        // Determine architecture
-        val arch = "x64" // TODO: detect architecture
-        val os = "linux" // TODO: detect OS
+    override fun getDownloadUrl(): String {
+        val arch = when (val current = Arch.current) {
+            is Arch.Amd64 -> "x64"
+            is Arch.Arm64 -> "aarch64"
+            is Arch.Unknown -> fail("Unsupported architecture: ${current.archString}")
+        }
 
-        // Eclipse Temurin download URL pattern
-        return "https://api.adoptium.net/v3/binary/latest/$version/ga/$os/$arch/jdk/hotspot/normal/eclipse"
+        return "https://api.adoptium.net/v3/binary/latest/$version/ga/linux/$arch/jdk/hotspot/normal/eclipse"
     }
 }

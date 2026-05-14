@@ -43,6 +43,10 @@ class KannichCommand : CliktCommand(name = "kannich") {
         configureLogging()
         logger.info("Kannich ${Version.VERSION}")
 
+        // make the default environment known. A lot of stuff depends on this,
+        // so we need to do this really at the beginning before anything else.
+        DefaultEnv.env = System.getenv() + buildEnvironment()
+
         if (execution == null && !list) {
             logger.info("Usage: kannich [OPTIONS] <execution>")
             logger.error("No execution specified. Use 'kannich <execution>' to run a pipeline.")
@@ -57,16 +61,9 @@ class KannichCommand : CliktCommand(name = "kannich") {
             exitProcess(1)
         }
 
-        val finalEnv = buildEnvironment()
-        DefaultEnv.env = finalEnv
-
-        val settingsXml = finalEnv["KANNICH_BOOTSTRAP_SETTINGS_XML"] ?: ""
-
-        setupMavenRepository(settingsXml)
-
-
-        // Configure proxy for Maven dependency resolution
-        ProxyConfiguration.configureFromEnvironment(finalEnv)
+        // Maven and JVM proxy configuration, so we can resolve script dependencies later
+        setupMavenRepository(DefaultEnv.env["KANNICH_BOOTSTRAP_SETTINGS_XML"] ?: "")
+        ProxyConfiguration.configureFromEnvironment(DefaultEnv.env)
 
         // Parse the script
         logger.info("Loading pipeline from $kannichFile...")
@@ -100,7 +97,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // Run the execution
         logger.info("Running execution: $execution")
 
-        val executionEngine = ExecutionEngine(Path.of(Kannich.WORKSPACE_DIR).absolute(), finalEnv)
+        val executionEngine = ExecutionEngine(Path.of(Kannich.WorkspaceDir).absolute())
 
         executionEngine.runExecution(pipeline, execution!!).getOrElse {
             logger.error("Execution failed: ${it.message}")
@@ -130,11 +127,15 @@ class KannichCommand : CliktCommand(name = "kannich") {
     }
 
     private fun determineHostEnvVars(): Map<String, String> {
-        // read the current env from /workspace/.kannich_current_env (this line based VARIABLE=VALUE). Can be
+        // determine workspace dir. This is sort of duplicating Kannich.WorkspaceDir, but Kannich.WorkspaceDir depends on
+        // the DefaultEnv - which is what we're currently setting up here.
+        val workspaceDir = System.getenv("KANNICH_PROJECT_DIR") ?: "/workspace"
+
+        // read the current env from $workspaceDir/.kannich_current_env (this line based VARIABLE=VALUE). Can be
         // terminated by LF or CRLF depending on the host OS.
-        val currentEnvFile = Path.of("${Kannich.WORKSPACE_DIR}/.kannich_current_env")
+        val currentEnvFile = Path.of("$workspaceDir/.kannich_current_env")
         val hostEnv = mutableMapOf<String, String>()
-        logger.debug("Reading current env from $currentEnvFile")
+        logger.debug("Reading current env from {}", currentEnvFile)
         withFileContentIfFileExists(currentEnvFile) { content ->
             logger.debug("Content: $content")
             // env entries are separated by \u0000
@@ -148,7 +149,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         }
 
         // delete the current env file for security reasons
-        logger.debug("Deleting $currentEnvFile")
+        logger.debug("Deleting {}", currentEnvFile)
         FsUtil.delete(currentEnvFile).getOrElse { logger.warn("Failed to delete $currentEnvFile: ${it.message}") }
         logger.debug("Read env vars: ${hostEnv.keys.joinToString(", ")}")
 
@@ -157,7 +158,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         // prefix list. a line "<defaults>" in the .kannichenv file is a placeholder for the default list.
         val defaultPrefixes = listOf("CI_", "GITHUB_", "BUILD_", "CIRCLE_", "TRAVIS_", "BITBUCKET_", "KANNICH_")
         val effectivePrefixes = mutableSetOf<String>()
-        val kannichEnvFile = Path.of("${Kannich.WORKSPACE_DIR}/.kannichenv")
+        val kannichEnvFile = Path.of("$workspaceDir/.kannichenv")
         val usedKannichEnv = withFileContentIfFileExists(kannichEnvFile) { content ->
             content.lines().forEach { line ->
                 // remove comments (anything following a #)
@@ -171,7 +172,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         if (!usedKannichEnv) {
             effectivePrefixes.addAll(defaultPrefixes)
         }
-        logger.debug("Filtering env vars for prefixes: $effectivePrefixes")
+        logger.debug("Filtering env vars for prefixes: {}", effectivePrefixes)
 
         // remove env vars that do not start with one of the prefixes
         return hostEnv.filterKeys { key -> effectivePrefixes.any { key.startsWith(it) } }
@@ -195,7 +196,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
         m2Dir.mkdirs()
 
         val target = if (devMode) {
-            val devRepo = File(Kannich.DEV_REPO_DIR)
+            val devRepo = File("/kannich/dev-repo")
             if (!devRepo.exists()) {
                 logger.error("Dev mode requires host .m2/repository to be mounted.")
                 logger.error("Ensure ~/.m2/repository exists on host.")
@@ -204,7 +205,7 @@ class KannichCommand : CliktCommand(name = "kannich") {
             logger.info("Dev mode: using host Maven repository")
             devRepo.toPath()
         } else {
-            val cacheRepo = File("${Kannich.CACHE_DIR}/kannich-deps")
+            val cacheRepo = File("${Kannich.CacheDir}/kannich-deps")
             cacheRepo.mkdirs()
             cacheRepo.toPath()
         }

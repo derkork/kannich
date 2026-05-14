@@ -7,13 +7,32 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.9.0</version>
+        <version>0.10.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-test</artifactId>
+    <version>0.10.0</version>
     <name>Kannich Test Infrastructure</name>
     <description>Reusable test infrastructure for Kannich integration tests</description>
+
+    <properties>
+        <kotest.version>6.1.3</kotest.version>
+    </properties>
+
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.kannich</groupId>
+                <artifactId>kannich-bom</artifactId>
+                <version>0.10.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
 
     <dependencies>
         <dependency>
@@ -25,38 +44,14 @@
             <artifactId>kotlinx-coroutines-core</artifactId>
         </dependency>
 
-        <!-- Logging - included transitively so consumers don't need to add it -->
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-stdlib</artifactId>
         </dependency>
 
-        <!-- Testcontainers -->
         <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <scope>compile</scope>
-        </dependency>
-
-        <!-- Kotest with Testcontainers extension -->
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-extensions-testcontainers</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-runner-junit5-jvm</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-assertions-core-jvm</artifactId>
-            <scope>compile</scope>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-tools</artifactId>
         </dependency>
     </dependencies>
 

@@ -4,11 +4,11 @@ import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
+import dev.kannich.stdlib.Arch
 import dev.kannich.tools.Cache
 import dev.kannich.tools.Fs
 import dev.kannich.tools.Shell
 import dev.kannich.tools.Web
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 /**
@@ -41,83 +41,46 @@ import org.slf4j.LoggerFactory
  * ```
  */
 class PreCommit(val version: String) : Tool {
-    private val logger: Logger = LoggerFactory.getLogger(PreCommit::class.java)
+    private val logger = LoggerFactory.getLogger(PreCommit::class.java)
 
-    companion object {
-        private const val CACHE_KEY = "pre-commit"
-    }
+    private val installDir = "tools/pre-commit/${Arch.current.archString}/$version"
+    private val binary = "$installDir/pre-commit"
 
-    /**
-     * Gets the pre-commit installation directory path inside the container.
-     */
-    suspend fun home(): String =
-        Cache.path("$CACHE_KEY/pre-commit-$version")
+    override suspend fun getToolPaths() = listOf(Cache.path(installDir))
 
-
-    override suspend fun getToolPaths() = listOf(home())
-
-    /**
-     * Ensures pre-commit is installed in the Cache.
-     * Downloads from GitHub releases if not already present.
-     */
     override suspend fun ensureInstalled() {
-        val cacheKey = "$CACHE_KEY/pre-commit-$version"
-
-        if (Cache.exists(cacheKey)) {
+        if (Fs.exists(Cache.path(binary))) {
             logger.debug("Pre-commit $version is already installed.")
             return
         }
 
         logger.info("Pre-commit $version is not installed, downloading.")
 
-        // Ensure pre-commit cache directory exists
-        Cache.ensureDir(CACHE_KEY)
+        Cache.ensureDir(installDir)
 
-        // Create version-specific directory
-        val preCommitDir = Cache.path(cacheKey)
-        Fs.mkdir(preCommitDir)
+        // pre-commit ships as a .pyz (Python zip application) - a self-contained executable
+        val downloadedFile = Web.download(
+            "https://github.com/pre-commit/pre-commit/releases/download/v$version/pre-commit-$version.pyz"
+        )
+        Fs.move(downloadedFile, Cache.path(binary))
+        Fs.chmod(Cache.path(binary), "755")
 
-        // Download pre-commit .pyz file (Python zip application)
-        val downloadUrl = getDownloadUrl(version)
-        val downloadedFile = Web.download(downloadUrl)
-
-        // Move the downloaded .pyz file to the pre-commit binary location
-        val preCommitBinary = "$preCommitDir/pre-commit"
-        Fs.move(downloadedFile, preCommitBinary)
-
-        // Make it executable
-        Shell.exec("chmod", "+x", preCommitBinary)
-
-        // Verify installation succeeded - pre-commit binary should exist
-        if (!Fs.exists(preCommitBinary)) {
-            fail("Pre-commit installation failed: expected binary $preCommitBinary not found")
+        if (!Fs.exists(Cache.path(binary))) {
+            fail("Pre-commit installation failed: binary not found after download")
         }
 
         logger.info("Successfully installed pre-commit $version.")
     }
 
-    /**
-     * Executes pre-commit with the given arguments.
-     * Throws JobFailedException if the execution fails.
-     *
-     * @param args Arguments to pass to pre-commit
-     * @throws dev.kannich.stdlib.JobFailedException if the command fails
-     */
-    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
+    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean): ExecResult {
         ensureInstalled()
 
-        val homeDir = home()
-        val preCommitBinary = "$homeDir/pre-commit"
-
-        // Set up cache directory for pre-commit's hooks and environments
-        val hooksCacheKey = "$CACHE_KEY/cache"
+        // Pre-commit uses PRE_COMMIT_HOME for its hooks and environments cache
+        val hooksCacheKey = "tools/pre-commit/cache"
         Cache.ensureDir(hooksCacheKey)
-        val hooksCachePath = Cache.path(hooksCacheKey)
 
-        // Pre-commit uses PRE_COMMIT_HOME environment variable for its cache
-        val ctx = JobContext.current()
-        val result = ctx.withEnv(mapOf("PRE_COMMIT_HOME" to hooksCachePath)) {
-            Shell.exec(preCommitBinary, *args, silent = silent)
+        val result = JobContext.current().withEnv(mapOf("PRE_COMMIT_HOME" to Cache.path(hooksCacheKey))) {
+            Shell.exec(Cache.path(binary), *args, silent = silent)
         }
 
         if (!allowFailure && !result.success) {
@@ -126,16 +89,5 @@ class PreCommit(val version: String) : Tool {
         }
 
         return result
-    }
-
-    /**
-     * Gets the download URL for the specified pre-commit version.
-     * Uses GitHub releases from pre-commit/pre-commit.
-     */
-    private fun getDownloadUrl(version: String): String {
-        // Pre-commit releases are available on GitHub as .pyz files
-        // .pyz is a Python zip application - a self-contained executable Python application
-        // Format: pre-commit-{version}.pyz
-        return "https://github.com/pre-commit/pre-commit/releases/download/v$version/pre-commit-$version.pyz"
     }
 }

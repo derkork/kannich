@@ -1,5 +1,6 @@
 package dev.kannich.tools
 
+import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.Kannich
 
 /**
@@ -27,8 +28,14 @@ object Cache {
      * @return The full path to the cached item
      */
     suspend fun path(key: String): String {
-        return "${Kannich.CACHE_DIR}/$key"
+        return "${Kannich.CacheDir}/$key"
     }
+
+    /**
+     * Utility method for constructing a cache key from tool, architecture, and version. Used by most
+     * kannich tools to build up their caching structures.
+     */
+    fun key(tool:String,version:String,arch:String = Arch.current.archString): String = "tools/${tool}/${arch}/${version}"
 
     /**
      * Gets the base cache directory path.
@@ -36,7 +43,7 @@ object Cache {
      * @return The cache directory path
      */
     suspend fun baseDir(): String {
-       return Kannich.CACHE_DIR
+       return Kannich.CacheDir
     }
 
     /**
@@ -49,7 +56,7 @@ object Cache {
         if (key != null) {
             Fs.delete(path(key))
         } else {
-            val contents = Fs.glob("*", Kannich.CACHE_DIR)
+            val contents = Fs.glob("*", Kannich.CacheDir)
             contents.forEach { Fs.delete(it) }
         }
     }

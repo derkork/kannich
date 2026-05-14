@@ -1,21 +1,10 @@
 package dev.kannich.core.execution
 
-import dev.kannich.stdlib.ArtifactSpec
-import dev.kannich.stdlib.ExecutionReference
-import dev.kannich.stdlib.ExecutionStep
-import dev.kannich.stdlib.Job
-import dev.kannich.stdlib.JobExecutionStep
-import dev.kannich.stdlib.JobFailedException
-import dev.kannich.stdlib.JobScope
-import dev.kannich.stdlib.ParallelSteps
-import dev.kannich.stdlib.Pipeline
-import dev.kannich.stdlib.SequentialSteps
-import dev.kannich.stdlib.JobContext
-import dev.kannich.stdlib.On
-import dev.kannich.stdlib.timed
-import dev.kannich.stdlib.FsUtil
-import dev.kannich.stdlib.ProcessUtil
-import kotlinx.coroutines.*
+import dev.kannich.stdlib.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
@@ -24,7 +13,6 @@ import java.nio.file.Path
  */
 class ExecutionEngine(
     private val artifactsDir: Path,
-    private val extraEnv: Map<String, String> = emptyMap()
 ) {
     private val logger = LoggerFactory.getLogger(ExecutionEngine::class.java)
 
@@ -35,7 +23,7 @@ class ExecutionEngine(
         val execution = pipeline.executions[executionName]
             ?: throw IllegalArgumentException("Execution not found: $executionName")
 
-        // first create initial layer, as we don't modify the working copy
+        // first create the initial layer, as we don't modify the working copy
         val initialLayerId = LayerManager.createJobLayer().getOrElse { return Result.failure(it) }
 
         return executeSequential(execution.steps, initialLayerId)
@@ -46,7 +34,7 @@ class ExecutionEngine(
         layerId: String
     ): Result<Unit> {
         // sequential steps don't need new layers, they can just work on the same layer one after another
-        for ((index, step) in steps.withIndex()) {
+        for (step in steps) {
             val result = when (step) {
                 // simple job execution, run it on the layer
                 is JobExecutionStep -> executeJob(step.job, LayerManager.getLayerWorkDir(layerId))
@@ -72,7 +60,7 @@ class ExecutionEngine(
         // for parallel steps we need to create a new layer for each child job, based on the parent layer
         // so that the parallel jobs don't interfere with each other.
         // after all jobs are done, we apply the changes to the parent layer in the order in which
-        // the jobs are defined in the pipeline. afterwards we delete the parallel layers.
+        // the jobs are defined in the pipeline. Afterward, we delete the parallel layers.
 
         val parallelLayerIds = mutableListOf<String>()
         val results = runBlocking {
@@ -93,7 +81,7 @@ class ExecutionEngine(
             }.awaitAll()
         }
 
-        // if not all jobs succeeded, return false, don't bother deleting the layers as we'll terminate soon anyways.
+        // if not all jobs succeeded, return false, don't bother deleting the layers as we'll terminate soon anyway.
         if (!results.all { it.isSuccess }) {
             return Result.failure(Exception("Not all jobs succeeded"))
         }
@@ -129,10 +117,10 @@ class ExecutionEngine(
 
     private fun executeJob(job: Job, workDir: String): Result<Unit> {
         val jobName = if (job.name != null) " ${job.name}"  else  ""
-        logger.info("Running$jobName")
+        logger.info("Running job $jobName")
         // Create job context
         val jobCtx = JobContext(
-            env = System.getenv() + extraEnv,
+            env = DefaultEnv.env,
             workingDir = workDir
         )
 
@@ -141,7 +129,7 @@ class ExecutionEngine(
         val scope = JobScope(job.name)
         try {
             try {
-                timed("Job$jobName") {
+                timed("Job $jobName") {
                     runBlocking(jobCtx) {
                         job.block(scope)
                     }
@@ -192,7 +180,7 @@ class ExecutionEngine(
             return Result.success(Unit)
         }
 
-        // Security check: ensure all destinations are within artifacts dir
+        // Security check: ensure all destinations are within the artifacts dir
         val safePaths = matchingPaths.filter { relativePath ->
             val sourceFile = workDir.resolve(relativePath).normalize()
             if (!sourceFile.startsWith(workDir.normalize())) {

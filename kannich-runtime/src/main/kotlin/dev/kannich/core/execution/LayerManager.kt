@@ -2,6 +2,7 @@ package dev.kannich.core.execution
 
 import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.FsUtil
+import dev.kannich.stdlib.Kannich
 import dev.kannich.stdlib.ProcessUtil
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -25,7 +26,7 @@ object LayerManager {
     /**
      * Creates a job layer for isolation. Uses overlayfs to avoid having to copy all workspace files into the layer.
      *
-     * @param parentLayerId Optional parent layer to base on. If null, uses /workspace.
+     * @param parentLayerId Optional parent layer to base on. If null, uses Kannich.WorkspaceDir
      */
     fun createJobLayer(parentLayerId: String? = null): Result<String> {
         if (!FsUtil.exists(Path.of("/kannich/overlays")).getOrElse { return Result.failure(it) }) {
@@ -38,7 +39,7 @@ object LayerManager {
         val lowerDir = if (parentLayerId != null) {
             getLayerWorkDir(parentLayerId)
         } else {
-            "/workspace"
+            Kannich.WorkspaceDir
         }
 
         logger.debug("Creating job layer: $layerId (from ${parentLayerId ?: "workspace"})")

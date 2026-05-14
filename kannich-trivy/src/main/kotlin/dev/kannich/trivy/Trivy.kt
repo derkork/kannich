@@ -1,15 +1,11 @@
 package dev.kannich.trivy
 
+import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.ExecResult
-import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
+import dev.kannich.tools.ArchiveToolInstaller
 import dev.kannich.tools.Cache
-import dev.kannich.tools.Compressor
 import dev.kannich.tools.Fs
-import dev.kannich.tools.Shell
-import dev.kannich.tools.Web
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
 /**
  * Provides Trivy security scanning for Kannich pipelines.
@@ -40,83 +36,18 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Trivy(val version: String) : Tool {
-    private val logger: Logger = LoggerFactory.getLogger(Trivy::class.java)
+class Trivy(version: String) : ArchiveToolInstaller("trivy", version) {
 
-    companion object {
-        private const val CACHE_KEY = "trivy"
-    }
+    @Deprecated("Use getInstallPath() instead", ReplaceWith("getInstallPath()"), DeprecationLevel.WARNING)
+    suspend fun home(): String = getInstallPath()
 
-    /**
-     * Gets the Trivy installation directory path inside the container.
-     */
-    suspend fun home(): String =
-        Cache.path("$CACHE_KEY/trivy-$version")
+    override fun getMainExecutable(): String = "trivy"
 
-
-    override suspend fun getToolPaths() = listOf(home())
-
-    /**
-     * Ensures Trivy is installed in the Cache.
-     * Downloads from GitHub releases if not already present.
-     */
-    override suspend fun ensureInstalled() {
-        val cacheKey = "$CACHE_KEY/trivy-$version"
-
-        if (Cache.exists(cacheKey)) {
-            logger.debug("Trivy $version is already installed.")
-            return
-        }
-
-        logger.info("Trivy $version is not installed, downloading.")
-
-        // Ensure trivy cache directory exists
-        Cache.ensureDir(CACHE_KEY)
-
-        // Create version-specific directory
-        val trivyDir = Cache.path(cacheKey)
-        Fs.mkdir(trivyDir)
-
-        // Download and extract Trivy
-        val downloadUrl = getDownloadUrl(version)
-        val archive = Web.download(downloadUrl)
-        Compressor.extract(archive, trivyDir)
-
-        // Verify extraction succeeded - trivy binary should exist
-        val trivyBinary = "$trivyDir/trivy"
-        if (!Fs.exists(trivyBinary)) {
-            fail("Trivy extraction failed: expected binary $trivyBinary not found")
-        }
-
-        logger.info("Successfully installed Trivy $version.")
-    }
-
-    /**
-     * Executes Trivy with the given arguments.
-     *
-     * @param args Arguments to pass to Trivy
-     */
     override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean): ExecResult {
-        ensureInstalled()
-
-        val homeDir = home()
-        val trivyBinary = "$homeDir/trivy"
-
-        // Set up cache directory for Trivy's vulnerability database
-        val dbCacheKey = "$CACHE_KEY/db"
+        val dbCacheKey = "tools/trivy/db"
         Cache.ensureDir(dbCacheKey)
-        val dbCachePath = Cache.path(dbCacheKey)
-
-        val result = Shell.exec(trivyBinary, "--cache-dir", dbCachePath, *args, silent = silent)
-
-        if (!allowFailure && !result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
-            fail("Trivy command failed: $errorMessage")
-        }
-
-        return result
+        return super.exec("--cache-dir", Cache.path(dbCacheKey), *args, silent = silent, allowFailure = allowFailure)
     }
-
 
     /**
      * Scans a filesystem for vulnerabilities and generates an HTML report.
@@ -125,33 +56,24 @@ class Trivy(val version: String) : Tool {
      * @param severity Severity level to filter vulnerabilities, defaults to 'CRITICAL,HIGH'
      */
     suspend fun scanFs(reportPath: String = "target/report.html", severity: String = "CRITICAL,HIGH") {
-        // ensure parent directory of output file exists
-        val parentDir = Fs.getParent(reportPath)
-        Fs.mkdir(parentDir)
-
+        Fs.mkdir(Fs.getParent(reportPath))
         exec(
-            "fs",
-            "--quiet",
-            "--scanners",
-            "vuln",
-            ".",
+            "fs", "--quiet", "--scanners", "vuln", ".",
             "--severity", severity,
             "--ignore-unfixed",
             "--exit-code", "1",
-            "--format",
-            "template",
-            "--template",
-            "@${home()}/contrib/html.tpl", "-o", reportPath
+            "--format", "template",
+            "--template", "@${getInstallPath()}/contrib/html.tpl",
+            "-o", reportPath
         )
     }
 
-    /**
-     * Gets the download URL for the specified Trivy version.
-     * Uses GitHub releases from aquasecurity/trivy.
-     */
-    private fun getDownloadUrl(version: String): String {
-        // Trivy releases are available on GitHub
-        // Format: trivy_{version}_Linux-64bit.tar.gz
-        return "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-64bit.tar.gz"
+    override fun getDownloadUrl(): String {
+        val arch = when (val current = Arch.current) {
+            is Arch.Amd64 -> "64bit"
+            is Arch.Arm64 -> "ARM64"
+            is Arch.Unknown -> fail("Unsupported architecture: ${current.archString}")
+        }
+        return "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-$arch.tar.gz"
     }
 }

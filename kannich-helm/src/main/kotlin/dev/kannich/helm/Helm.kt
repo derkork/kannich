@@ -1,8 +1,10 @@
 package dev.kannich.helm
 
+import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.Tool
 import dev.kannich.stdlib.fail
+import dev.kannich.tools.ArchiveToolInstaller
 import dev.kannich.tools.Cache
 import dev.kannich.tools.Compressor
 import dev.kannich.tools.Fs
@@ -41,94 +43,15 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class Helm(val version: String) : Tool {
-    private val logger: Logger = LoggerFactory.getLogger(Helm::class.java)
+class Helm(version: String) : ArchiveToolInstaller("helm", version, archiveStripComponents = 1) {
+    override fun getMainExecutable(): String = "helm"
 
-    companion object {
-        private const val CACHE_KEY = "helm"
-    }
-
-    /**
-     * Gets the Helm installation directory path inside the container.
-     */
-    suspend fun home(): String =
-        Cache.path("$CACHE_KEY/helm-$version")
-
-
-    override suspend fun getToolPaths() = listOf(home())
-
-    /**
-     * Ensures Helm is installed in the Cache.
-     * Downloads from get.helm.sh if not already present.
-     */
-    override suspend fun ensureInstalled() {
-        val cacheKey = "$CACHE_KEY/helm-$version"
-
-        if (Cache.exists(cacheKey)) {
-            logger.debug("Helm $version is already installed.")
-            return
+    override fun getDownloadUrl(): String {
+        val arch = when (val current = Arch.current) {
+            is Arch.Amd64 -> "amd64"
+            is Arch.Arm64 -> "arm64"
+            is Arch.Unknown -> fail("Unsupported architecture: ${current.archString}")
         }
-
-        logger.info("Helm $version is not installed, downloading.")
-
-        // Ensure helm cache directory exists
-        Cache.ensureDir(CACHE_KEY)
-
-        // Create version-specific directory
-        val helmDir = Cache.path(cacheKey)
-        Fs.mkdir(helmDir)
-
-        // Download and extract Helm
-        val downloadUrl = getDownloadUrl(version)
-        val archive = Web.download(downloadUrl)
-        Compressor.extract(archive, helmDir)
-
-        // Helm archives extract to linux-amd64/helm, move it to the right place
-        val extractedBinary = "$helmDir/linux-amd64/helm"
-        val targetBinary = "$helmDir/helm"
-        if (Fs.exists(extractedBinary)) {
-            Fs.move(extractedBinary, targetBinary)
-            Fs.delete("$helmDir/linux-amd64")
-        }
-
-        // Verify extraction succeeded - helm binary should exist
-        if (!Fs.exists(targetBinary)) {
-            fail("Helm extraction failed: expected binary $targetBinary not found")
-        }
-
-        logger.info("Successfully installed Helm $version.")
-    }
-
-    /**
-     * Executes Helm with the given arguments.
-     * Throws JobFailedException if the execution fails.
-     *
-     * @param args Arguments to pass to Helm
-     * @throws dev.kannich.stdlib.JobFailedException if the command fails
-     */
-    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
-        ensureInstalled()
-
-        val homeDir = home()
-        val helmBinary = "$homeDir/helm"
-
-        val result = Shell.exec(helmBinary, *args, silent = silent)
-
-        if (!allowFailure && !result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
-            fail("Helm command failed: $errorMessage")
-        }
-
-        return result
-    }
-
-    /**
-     * Gets the download URL for the specified Helm version.
-     * Uses the official Helm download site.
-     */
-    private fun getDownloadUrl(version: String): String {
-        // Helm releases are available at get.helm.sh
-        // Format: helm-v{version}-linux-amd64.tar.gz
-        return "https://get.helm.sh/helm-v$version-linux-amd64.tar.gz"
+        return "https://get.helm.sh/helm-v$version-linux-$arch.tar.gz"
     }
 }

@@ -18,7 +18,7 @@ object ProcessUtil {
      */
     fun exec(
         command: List<String>,
-        workingDir: String = "/workspace",
+        workingDir: String = Kannich.WorkspaceDir,
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
     ): Result<ExecResult> = runCatching {
@@ -58,7 +58,7 @@ object ProcessUtil {
      */
     fun execShell(
         command: String,
-        workingDir: String = "/workspace",
+        workingDir: String = Kannich.WorkspaceDir,
         env: Map<String, String> = emptyMap(),
         silent: Boolean = false
     ): Result<ExecResult> {

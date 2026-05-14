@@ -7,18 +7,26 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.9.0</version>
+        <version>0.10.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-aws-cli</artifactId>
-    <version>0.5.0</version>
+    <version>0.6.0</version>
     <name>Kannich AWS CLI Plugin</name>
     <description>AWS CLI plugin for Kannich - installs and runs AWS CLI v2</description>
 
-    <properties>
-        <kannich.test.image>derkork/kannich:0.9.0-0.9.0</kannich.test.image>
-    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.kannich</groupId>
+                <artifactId>kannich-bom</artifactId>
+                <version>0.10.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Kotlin -->
@@ -30,26 +38,17 @@
         <!-- Tools/stdlib helpers used by the module -->
         <dependency>
             <groupId>dev.kannich</groupId>
+            <artifactId>kannich-stdlib</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.kannich</groupId>
             <artifactId>kannich-tools</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- Testing -->
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-test</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-runner-junit5-jvm</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-assertions-core-jvm</artifactId>
         </dependency>
     </dependencies>
 

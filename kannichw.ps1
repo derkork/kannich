@@ -18,9 +18,7 @@ if ($env:KANNICH_DOCKER_PROXY_PREFIX) {
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = if ($env:KANNICH_PROJECT_DIR) { $env:KANNICH_PROJECT_DIR } else { $ScriptDir }
 
-# KANNICH_PROJECT_DIR is used inside the container to find the workspace. When using the wrapper,
-# it is always /workspace.
-$env:KANNICH_PROJECT_DIR = "/workspace"
+# KANNICH_PROJECT_DIR inside the container is always /workspace (set via the env file below).
 
 # Check for Docker
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -64,10 +62,7 @@ if ($env:KANNICH_CACHE_DIR) {
     $CacheMount = "kannich-cache:/kannich/cache"
 }
 
-# in either case, when run through the wrapper KANNICH_CACHE_DIR inside of the container
-# is always /kannich/cache. We set this here because the environment variable later goes
-# into the container and is picked up there.
-$env:KANNICH_CACHE_DIR = "/kannich/cache"
+# KANNICH_CACHE_DIR inside the container is always /kannich/cache (set via the env file below).
 
 # Detect --dev-mode / -d flag
 $DevMode = $false
@@ -119,9 +114,15 @@ if (-not $env:KANNICH_BOOTSTRAP_SETTINGS_XML) {
 }
 
 # Put all environment variables into a file named ".kannich_current_env"
-# Use null bytes as delimiters to handle multiline values unambiguously
+# Use null bytes as delimiters to handle multiline values unambiguously.
+# Override container-specific paths so the container sees /workspace and /kannich/cache
+# regardless of host-side values, without modifying the current session's env vars.
 $EnvFile = Join-Path $ProjectDir ".kannich_current_env"
-$EnvContent = ([Environment]::GetEnvironmentVariables().GetEnumerator() | ForEach-Object { $_.Key + "=" + $_.Value + [char]0 }) -join ''
+$ContainerEnvOverrides = @{ "KANNICH_PROJECT_DIR" = "/workspace"; "KANNICH_CACHE_DIR" = "/kannich/cache" }
+$EnvContent = ([Environment]::GetEnvironmentVariables().GetEnumerator() | ForEach-Object {
+    $val = if ($ContainerEnvOverrides.ContainsKey($_.Key)) { $ContainerEnvOverrides[$_.Key] } else { $_.Value }
+    $_.Key + "=" + $val + [char]0
+}) -join ''
 [IO.File]::WriteAllText($EnvFile, $EnvContent)
 
 # Cleanup function
@@ -135,6 +136,11 @@ $Cleanup = {
 # Handle Ctrl+C
 try {
     # Run Kannich inside Docker
+    $ExtraDockerOpts = @()
+    if ($env:KANNICH_DOCKER_OPTS) {
+        $ExtraDockerOpts = $env:KANNICH_DOCKER_OPTS -split '\s+'
+    }
+
     $dockerArgs = @(
         "run", "--rm",
         "--init",
@@ -143,7 +149,7 @@ try {
     ) + $TtyFlag + @(
         "-v", "${ProjectDir}:/workspace",
         "-v", $CacheMount
-    ) + $DevModeMount + @(
+    ) + $DevModeMount + $ExtraDockerOpts + @(
         "-w", "/workspace",
         $KannichImage
     ) + $args

@@ -1,15 +1,8 @@
 package dev.kannich.awscli
 
-import dev.kannich.stdlib.ExecResult
-import dev.kannich.stdlib.Tool
+import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.fail
-import dev.kannich.tools.Cache
-import dev.kannich.tools.Compressor
-import dev.kannich.tools.Fs
-import dev.kannich.tools.Shell
-import dev.kannich.tools.Web
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import dev.kannich.tools.ArchiveToolInstaller
 
 /**
  * Provides AWS CLI v2 for Kannich pipelines.
@@ -25,85 +18,15 @@ import org.slf4j.LoggerFactory
  * }
  * ```
  */
-class AwsCli(val version: String) : Tool {
-    private val logger: Logger = LoggerFactory.getLogger(AwsCli::class.java)
+class AwsCli(version: String) : ArchiveToolInstaller("aws-cli", version, archiveFormat = ".zip") {
+    override fun getMainExecutable(): String  = "aws/dist/aws"
 
-    companion object {
-        private const val CACHE_KEY = "awscli"
-    }
-
-    /**
-     * Gets the AWS CLI installation directory path inside the container.
-     */
-    suspend fun home(): String = Cache.path("$CACHE_KEY/awscli-$version")
-
-    override suspend fun getToolPaths() = listOf("${home()}aws/dist")
-
-    /**
-     * Ensures AWS CLI is installed in the Cache.
-     * Downloads from AWS if not already present.
-     */
-    override suspend fun ensureInstalled() {
-        val cacheKey = "$CACHE_KEY/awscli-$version"
-
-        if (Cache.exists(cacheKey)) {
-            logger.debug("AWS CLI $version is already installed.")
-            return
+    override fun getDownloadUrl(): String {
+        val arch = when (val current = Arch.current) {
+            is Arch.Amd64 -> "x86_64"
+            is Arch.Arm64 -> "aarch64"
+            is Arch.Unknown -> fail("Unsupported architecture: ${current.archString}")
         }
-
-        logger.info("AWS CLI $version is not installed, downloading.")
-
-        // Ensure cache directory exists
-        Cache.ensureDir(CACHE_KEY)
-
-        // Create version-specific directory
-        val awsCliDir = Cache.path(cacheKey)
-        Fs.mkdir(awsCliDir)
-
-        // Download and extract AWS CLI v2. The archive contains an 'aws' directory with 'dist/aws'
-        val downloadUrl = getDownloadUrl(version)
-        val archive = Web.download(downloadUrl)
-        Compressor.extract(archive, awsCliDir)
-
-        // Verify extraction succeeded - aws binary should exist at aws/dist/aws
-        val awsBinary = "$awsCliDir/aws/dist/aws"
-        if (!Fs.exists(awsBinary)) {
-            fail("AWS CLI extraction failed: expected binary $awsBinary not found")
-        }
-
-        // Set executable bit just in case
-        Shell.exec("chmod", "+x", awsBinary)
-
-        logger.info("Successfully installed AWS CLI $version.")
-    }
-
-    /**
-     * Executes AWS CLI with the given arguments.
-     *
-     * @param args Arguments to pass to `aws`
-     */
-    override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
-        ensureInstalled()
-
-        val homeDir = home()
-        val awsBinary = "$homeDir/aws/dist/aws"
-
-        val result = Shell.exec(awsBinary, *args, silent = silent)
-
-        if (!allowFailure && !result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
-            fail("AWS CLI command failed: $errorMessage")
-        }
-
-        return result
-    }
-
-    /**
-     * Gets the download URL for the specified AWS CLI version.
-     * Uses awscli.amazonaws.com.
-     */
-    private fun getDownloadUrl(version: String): String {
-        // Format: awscli-exe-linux-x86_64-{version}.zip
-        return "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${version}.zip"
+        return "https://awscli.amazonaws.com/awscli-exe-linux-${arch}-${version}.zip"
     }
 }

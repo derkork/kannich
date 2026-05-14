@@ -1,9 +1,8 @@
-@file:DependsOn("dev.kannich:kannich-stdlib:0.8.0")
-@file:DependsOn("dev.kannich:kannich-tools:0.8.0")
-@file:DependsOn("dev.kannich:kannich-maven:0.11.0")
-@file:DependsOn("dev.kannich:kannich-java:0.8.0")
-@file:DependsOn("dev.kannich:kannich-trivy:0.8.0")
-@file:DependsOn("dev.kannich:kannich-helm:0.8.0")
+@file:DependsOn("dev.kannich:kannich-stdlib:0.10.0")
+@file:DependsOn("dev.kannich:kannich-tools:0.10.0")
+@file:DependsOn("dev.kannich:kannich-maven:0.13.0")
+@file:DependsOn("dev.kannich:kannich-java:0.10.0")
+@file:DependsOn("dev.kannich:kannich-trivy:0.10.0")
 
 
 import dev.kannich.java.Java
@@ -11,17 +10,38 @@ import dev.kannich.maven.Maven
 import dev.kannich.stdlib.*
 import dev.kannich.tools.*
 import dev.kannich.trivy.Trivy
-import dev.kannich.helm.Helm
 
 pipeline {
     val java = Java("21")
     val trivy = Trivy("0.69.3")
 
-    suspend fun envToggle(name: String, defaultValue: Boolean = false): Boolean {
-        return "true" == (getEnv(name) ?: "$defaultValue")
+    suspend fun JobScope.collectModuleVersions(maven: Maven): Map<String, String> {
+        val versions = mutableMapOf<String, String>()
+
+        val items = maven.exec(
+            "-q", "install",
+            "exec:exec",
+            "-Dexec.executable=echo",
+            "-Dexec.args=\${project.groupId}:\${project.artifactId}:\${project.version}",
+            "-pl", "!kannich-cli,!kannich-runtime",
+            "-DskipTests"
+        ).stdout.lines()
+
+        for (item in items) {
+            val coordinates = item.substringBeforeLast(":")
+            val version = item.substringAfterLast(":")
+            if (coordinates.isBlank() || version.isBlank()) {
+                continue
+            }
+            versions[coordinates] = version
+        }
+
+        log("Collected module versions: $versions")
+
+        return versions
     }
 
-    suspend fun setupMavenForDeployment():Maven {
+    suspend fun JobScope.setupMavenForDeployment(): Maven {
         val sonatypeUsername = requireEnv("KANNICH_SONATYPE_USERNAME")
         val sonatypePassword = secret(requireEnv("KANNICH_SONATYPE_PASSWORD"))
         return Maven("3.9.6", java) {
@@ -31,6 +51,7 @@ pipeline {
             }
         }
     }
+
 
     execution("release-module", "Description releases a single module") {
         job {
@@ -57,17 +78,12 @@ pipeline {
             val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
             val gpgKey = requireEnv("KANNICH_GPG_KEY")
             val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
-
-            val setLatest = envToggle("KANNICH_SET_LATEST", true)
-            val dryRun = envToggle("KANNICH_DRY_RUN")
+            val setLatest = getEnvFlag("KANNICH_SET_LATEST") ?: true
+            val dryRun = getEnvFlag("KANNICH_DRY_RUN") ?: false
 
             val maven = setupMavenForDeployment()
-
             Gpg.importKey(gpgKey)
 
-            // build cli jar and docker image
-            log("Building jar and docker image")
-            Docker.enable()
             maven.exec("-B", "-q", "-Pbootstrap", "clean", "install", "-DskipTests")
 
             val imageVersion = cd("kannich-builder-image") {
@@ -76,8 +92,10 @@ pipeline {
 
             val imageBaseName = "derkork/kannich"
             val kannichImage = "$imageBaseName:$imageVersion"
-            // run trivy on docker image to detect vulnerabilities
-            log("Checking for vulnerabilities in docker image: $kannichImage")
+            val localImage = "localhost:5000/kannich:$imageVersion"
+
+            // run trivy on the local registry image before publishing
+            log("Checking for vulnerabilities in docker image: $localImage")
 
             artifacts(On.SUCCESS_OR_FAILURE) {
                 includes("trivy-docker-results.html")
@@ -86,7 +104,8 @@ pipeline {
             val home = trivy.home()
             trivy.exec(
                 "image",
-                kannichImage,
+                localImage,
+                "--insecure",
                 "--exit-code", "1",
                 "--exit-on-eol", "1",
                 "--severity", "CRITICAL",
@@ -99,12 +118,11 @@ pipeline {
             if (!dryRun) {
                 log("Publishing docker image to docker hub")
                 Docker.login(dockerUsername, dockerPassword)
-                Docker.exec("push", kannichImage)
-                // also push to the "latest" tag if desired
+                // copy the multi-platform manifest from local registry to Docker Hub without rebuilding
+                Docker.exec("buildx", "imagetools", "create", "-t", kannichImage, localImage)
                 if (setLatest) {
                     log("Setting latest tag")
-                    Docker.exec("tag", kannichImage, "$imageBaseName:latest")
-                    Docker.exec("push", "$imageBaseName:latest")
+                    Docker.exec("buildx", "imagetools", "create", "-t", "$imageBaseName:latest", localImage)
                 }
 
                 log("Publishing to Maven Central")
@@ -143,7 +161,6 @@ pipeline {
                         )
                     }
 
-
                     if (!success) path else null
                 }
             }
@@ -151,7 +168,6 @@ pipeline {
             artifacts(On.SUCCESS_OR_FAILURE) {
                 includes("*/target/report.html")
             }
-
 
             if(failures.isNotEmpty()) {
                 fail("Vulnerabilities found in dependencies: ${failures.joinToString(", ")}")
@@ -165,49 +181,44 @@ pipeline {
         }
     }
 
-    execution("smoke-test", "Runs a set of smoke tests to verify things work in general.") {
+    execution("update-test-versions", "Updates @file:DependsOn versions in all .tests.main.kts files to match current module versions") {
         job {
             val maven = Maven("3.9.6", java)
-            val helm = Helm("3.19.4")
-            java.exec("--version")
-            maven.exec("--version")
-            trivy.exec("version")
-            helm.exec("version")
+            val versions = collectModuleVersions(maven)
 
-            Docker.enable()
-            // try if we can run docker with a mount in the current work dir.
-            Fs.write("test.txt", "Hello world!")
-            val currentFolder = Fs.resolve("")
-            Docker.exec("run", "-v", "$currentFolder:/data", "alpine", "cat", "/data/test.txt")
+            val testFiles = Fs.glob("**/.tests.main.kts")
+            for (testFile in testFiles) {
+                var content = Fs.readAsString(testFile)
+                var changed = false
+                for ((artifactId, version) in versions) {
+                    val regex = Regex("""(@file:DependsOn\("${Regex.escape(artifactId)}:)[^"]+("\))""")
+                    val updated = regex.replace(content) { match ->
+                        "${match.groupValues[1]}$version${match.groupValues[2]}"
+                    }
+                    if (updated != content) {
+                        content = updated
+                        changed = true
+                    }
+                }
+                if (changed) {
+                    log("Updated versions in $testFile")
+                    Fs.write(testFile, content)
+                }
+            }
 
+            artifacts {
+                includes("**/.tests.main.kts")
+            }
         }
     }
 
     execution("update-docs-versions", "Extracts module versions and updates documentation") {
         job {
             val maven = Maven("3.9.6", java)
-
-            // Find all module directories
-            val modulePoms = Fs.glob("*/pom.xml")
-            val versions = mutableMapOf<String, String>()
-
-            for (pomPath in modulePoms) {
-                val moduleDir = pomPath.substringBeforeLast("/pom.xml")
-
-                // Skip modules not used as direct dependencies
-                if (moduleDir in listOf("kannich-builder-image", "kannich-runtime", "kannich-cli")) continue
-
-                cd(moduleDir) {
-                    val artifactId = maven.evaluateExpression("project.artifactId")
-                    val version = maven.evaluateExpression("project.version")
-                    log("Found module: $artifactId = $version")
-                    versions[artifactId] = version
-                }
-
-            }
+            val versions = collectModuleVersions(maven)
 
             // Generate JSON file for documentation
-            val json = "{${versions.entries.toList().sortedBy { it.key }.joinToString { "\"${it.key}\": \"${it.value}\"" }}}"
+            val json = "{${versions.entries.toList().sortedBy { it.key }.joinToString { "\"${it.key.substringAfterLast(":")}\": \"${it.value}\"" }}}"
 
             Fs.write("docs/static/versions.json", json)
 

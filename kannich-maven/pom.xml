@@ -7,20 +7,35 @@
     <parent>
         <groupId>dev.kannich</groupId>
         <artifactId>kannich-parent</artifactId>
-        <version>0.9.0</version>
+        <version>0.10.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>kannich-maven</artifactId>
-    <version>0.12.0</version>
+    <version>0.13.0</version>
     <name>Kannich Maven Plugin</name>
     <description>Maven plugin for Kannich - Maven build support</description>
 
-    <properties>
-        <kannich.test.image>derkork/kannich:0.9.0-0.9.0</kannich.test.image>
-    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.kannich</groupId>
+                <artifactId>kannich-bom</artifactId>
+                <version>0.10.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
+        <!-- Inter-extension dependency: explicit version required -->
+        <dependency>
+            <groupId>dev.kannich</groupId>
+            <artifactId>kannich-java</artifactId>
+            <version>0.10.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
@@ -28,34 +43,17 @@
 
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-tools</artifactId>
+            <artifactId>kannich-stdlib</artifactId>
         </dependency>
 
-        <!-- Inter-extension dependency: explicit version required -->
         <dependency>
             <groupId>dev.kannich</groupId>
-            <artifactId>kannich-java</artifactId>
-            <version>0.9.0</version>
+            <artifactId>kannich-tools</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- Testing -->
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-runner-junit5-jvm</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.kotest</groupId>
-            <artifactId>kotest-assertions-core-jvm</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>dev.kannich</groupId>
-            <artifactId>kannich-test</artifactId>
         </dependency>
     </dependencies>
 

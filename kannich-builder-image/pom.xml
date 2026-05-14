@@ -4,45 +4,27 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>dev.kannich</groupId>
-        <artifactId>kannich-parent</artifactId>
-        <version>0.9.0</version>
-        <relativePath>../pom.xml</relativePath>
-    </parent>
-
+    <groupId>dev.kannich</groupId>
     <artifactId>kannich-builder-image</artifactId>
-    <version>0.9.0-${kannich.core.version}</version>
+    <!-- Image Version - Kannich-Version -->
+    <version>0.11.0-${kannich.version}</version>
     <packaging>pom</packaging>
 
     <name>Kannich Builder Image</name>
     <description>Docker image for running Kannich pipelines</description>
 
+    <properties>
+        <kannich.version>0.10.0</kannich.version>
+    </properties>
+
     <build>
         <plugins>
-            <!-- Skip Kotlin compilation (this is a pom-only module) -->
-            <plugin>
-                <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>compile</id>
-                        <phase>none</phase>
-                    </execution>
-                    <execution>
-                        <id>test-compile</id>
-                        <phase>none</phase>
-                    </execution>
-                </executions>
-            </plugin>
-
             <!-- Copy the shaded CLI JAR -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>3.8.1</version>
                 <executions>
-                    <!-- Copy the shaded CLI JAR -->
                     <execution>
                         <id>copy-cli-jar</id>
                         <phase>package</phase>
@@ -54,7 +36,7 @@
                                 <artifactItem>
                                     <groupId>dev.kannich</groupId>
                                     <artifactId>kannich-cli</artifactId>
-                                    <version>${kannich.core.version}</version>
+                                    <version>${kannich.version}</version>
                                     <type>jar</type>
                                     <destFileName>kannich-cli.jar</destFileName>
                                 </artifactItem>
@@ -67,47 +49,80 @@
 
             <!-- Build Docker image -->
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.5.0</version>
+                <groupId>org.codehaus.gmavenplus</groupId>
+                <artifactId>gmavenplus-plugin</artifactId>
+                <version>4.3.1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.groovy</groupId>
+                        <artifactId>groovy</artifactId>
+                        <version>4.0.26</version>
+                        <scope>runtime</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.groovy</groupId>
+                        <artifactId>groovy-ant</artifactId>
+                        <version>4.0.26</version>
+                        <scope>runtime</scope>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>docker-build</id>
                         <phase>package</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
+                        <goals><goal>execute</goal></goals>
                         <configuration>
-                            <executable>docker</executable>
-                            <workingDirectory>${project.basedir}</workingDirectory>
-                            <arguments>
-                                <argument>buildx</argument>
-                                <argument>build</argument>
-                                <argument>-t</argument>
-                                <argument>derkork/kannich:${project.version}</argument>
-                                <argument>.</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+                            <scripts>
+                                <script>
+                                    def run = { List cmd ->
+                                        def proc = cmd.execute()
+                                        proc.consumeProcessOutput(System.out, System.err)
+                                        proc.waitFor()
+                                        if (proc.exitValue() != 0) throw new RuntimeException("Command failed: ${cmd.join(' ')}")
+                                    }
 
-            <!-- Clean up temporary files after Docker build -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>cleanup-docker-context</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <delete file="${project.basedir}/kannich-cli.jar" quiet="true"/>
-                            </target>
+                                    // Ensure local registry is running
+                                    def registryStart = "docker start registry".execute()
+                                    registryStart.waitFor()
+                                    if (registryStart.exitValue() != 0) {
+                                        run(["docker", "run", "-d", "-p", "5000:5000", "--name", "registry", "registry:2"])
+                                    }
+
+                                    // On Docker Desktop (Windows/Mac) the buildx container cannot reach
+                                    // localhost:5000 on the host, so use host.docker.internal instead.
+                                    // On Linux we add --driver-opt network=host so localhost resolves correctly.
+                                    def isDockerDesktop = System.getProperty("os.name").toLowerCase().contains("win") ||
+                                                          System.getProperty("os.name").toLowerCase().contains("mac")
+                                    def registryHost = isDockerDesktop ? "host.docker.internal" : "localhost"
+
+                                    // Write buildkitd config so the builder treats the local registry as plain HTTP
+                                    def buildkitConfig = new File(project.basedir, "buildkitd.toml")
+                                    buildkitConfig.text = "[registry.\"${registryHost}:5000\"]\n  http = true\n  insecure = true\n"
+
+                                    // Ensure multiarch builder exists
+                                    def builderUse = "docker buildx use multiarch".execute()
+                                    builderUse.waitFor()
+                                    if (builderUse.exitValue() != 0) {
+                                        def createCmd = ["docker", "buildx", "create", "--name", "multiarch", "--driver", "docker-container", "--use", "--config", buildkitConfig.absolutePath]
+                                        if (!isDockerDesktop) createCmd += ["--driver-opt", "network=host"]
+                                        run(createCmd)
+                                    }
+                                    buildkitConfig.delete()
+
+                                    // Install binfmt for cross-platform emulation
+                                    run(["docker", "run", "--rm", "--privileged", "tonistiigi/binfmt", "--install", "all"])
+
+                                    // Build and push to local registry
+                                    run(["docker", "buildx", "build",
+                                        "--platform", "linux/amd64,linux/arm64",
+                                        "--push",
+                                        "-t", "${registryHost}:5000/kannich:${project.version}",
+                                        project.basedir.toString()])
+
+                                    // Clean up build context
+                                    new File(project.basedir, "kannich-cli.jar").delete()
+                                </script>
+                            </scripts>
                         </configuration>
                     </execution>
                 </executions>

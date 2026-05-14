@@ -133,6 +133,7 @@ docker run --rm \
     -v "$PROJECT_DIR:/workspace" \
     -v "$CACHE_MOUNT" \
     $DEV_MODE_MOUNT \
+    $KANNICH_DOCKER_OPTS \
     -w /workspace \
     "$KANNICH_IMAGE" \
     "$@"

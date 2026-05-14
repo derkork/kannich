@@ -89,74 +89,29 @@ class MavenBuilder {
  * ```
  */
 class Maven(
-    val version: String,
+    version: String,
     private val java: Java,
     block: MavenBuilder.() -> Unit = {}
-) : Tool {
+) : ArchiveToolInstaller("maven", version, archiveStripComponents = 1) {
     private val logger: Logger = LoggerFactory.getLogger(Maven::class.java)
     private val config = MavenBuilder().apply(block)
     private val servers = config.servers
 
+    @Deprecated("Use getInstallPath() instead", ReplaceWith("getInstallPath()"), DeprecationLevel.WARNING)
+    suspend fun home(): String = getInstallPath()
 
-    companion object {
-        private const val CACHE_KEY = "maven"
-    }
+    override fun getMainExecutable(): String = "bin/mvn"
 
-    /**
-     * Gets the Maven home directory path inside the container.
-     */
-    suspend fun home(): String =
-        Cache.path("$CACHE_KEY/apache-maven-$version")
-
-    override suspend fun getToolPaths() = listOf("${home()}/bin")
-
-    /**
-     * Ensures Maven is installed in the Cache.
-     * Also ensures Java is installed first since Maven depends on it.
-     */
     override suspend fun ensureInstalled() {
-        // Ensure Java is installed first
         java.ensureInstalled()
-
-        val cacheKey = "$CACHE_KEY/apache-maven-$version"
-
-        if (Cache.exists(cacheKey)) {
-            logger.debug("Maven $version is already installed.")
-            return
-        }
-
-        logger.info("Maven $version is not installed, downloading.")
-
-        // Ensure maven cache directory exists
-        Cache.ensureDir(CACHE_KEY)
-
-        // Download and extract Maven
-        // Apache Maven tarballs extract to "apache-maven-$version" which matches our cache key
-        val downloadUrl = getDownloadUrl(version)
-        val mavenDir = Cache.path(CACHE_KEY)
-        val archive = Web.download(downloadUrl, "maven.tar.gz")
-        Compressor.extract(archive, mavenDir)
-
-        // Verify extraction succeeded
-        if (!Cache.exists(cacheKey)) {
-            throw RuntimeException("Maven extraction failed: expected directory ${Cache.path(cacheKey)} not found")
-        }
-
-        logger.info("Successfully installed Maven $version.")
+        super.ensureInstalled()
     }
 
-    /**
-     * Executes Maven with the given arguments.
-     * Throws JobFailedException if the execution fails.
-     *
-     * @param args Arguments to pass to Maven
-     * @throws dev.kannich.stdlib.JobFailedException if the command fails
-     */
     override suspend fun exec(vararg args: String, silent: Boolean, allowFailure: Boolean) : ExecResult {
         ensureInstalled()
 
-        val homeDir = home()
-        val javaHome = java.home()
+        val homeDir = getInstallPath()
+        val javaHome = java.getInstallPath()
 
         // Build command with settings.xml if servers are configured
         val settingsPath = generateSettingsXml()
@@ -174,28 +129,21 @@ class Maven(
         }
 
         // Cache the downloaded jar files.
-        val repositoryCacheKey = "$CACHE_KEY/repository"
+        val repositoryCacheKey = "tools/maven/repository"
         Cache.ensureDir(repositoryCacheKey)
 
         val allArgs = listOf("-Dmaven.repo.local=${Cache.path(repositoryCacheKey)}") +
                 settingsArgs + args.toList()
 
-        val env = mapOf(
-            "JAVA_HOME" to javaHome,
-            "MAVEN_HOME" to homeDir,
-            "M2_HOME" to homeDir
-        )
-
-        val result = JobContext.current().withEnv(env) {
-            Shell.exec("$homeDir/bin/mvn", *allArgs.toTypedArray(), silent = silent)
+        return JobContext.current().withEnv(
+            mapOf(
+                "JAVA_HOME" to javaHome,
+                "MAVEN_HOME" to homeDir,
+                "M2_HOME" to homeDir
+            )
+        ) {
+           super.exec(*allArgs.toTypedArray(), silent = silent, allowFailure = allowFailure)
         }
-
-        if (!allowFailure && !result.success) {
-            val errorMessage = result.stderr.ifBlank { "Exit code: ${result.exitCode}" }
-            fail("Command failed: $errorMessage")
-        }
-
-        return result
     }
 
     /**
@@ -315,11 +263,7 @@ class Maven(
             .replace("'", "&apos;")
     }
 
-    /**
-     * Gets the download URL for the specified Maven version.
-     * Uses Apache Maven binary distribution.
-     */
-    private fun getDownloadUrl(version: String): String {
+    override fun getDownloadUrl(): String {
         return "https://archive.apache.org/dist/maven/maven-3/$version/binaries/apache-maven-$version-bin.tar.gz"
     }
 }
