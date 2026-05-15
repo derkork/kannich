@@ -67,7 +67,12 @@ pipeline {
 
             log("Publishing to Maven Central")
             withEnv(mapOf("MAVEN_GPG_PASSPHRASE" to gpgPassphrase)) {
-                maven.exec("-B", "-Prelease", "deploy", "-DskipTests", "-pl", moduleName)
+                if (moduleName != "*") {
+                    maven.exec("-B", "-Prelease", "deploy", "-DskipTests", "-pl", moduleName)
+                }
+                else {
+                    maven.exec("-B", "-Prelease", "deploy", "-DskipTests")
+                }
             }
         }
     }
@@ -84,6 +89,7 @@ pipeline {
             val maven = setupMavenForDeployment()
             Gpg.importKey(gpgKey)
 
+            Docker.enable()
             maven.exec("-B", "-q", "-Pbootstrap", "clean", "install", "-DskipTests")
 
             val imageVersion = cd("kannich-builder-image") {
@@ -118,11 +124,25 @@ pipeline {
             if (!dryRun) {
                 log("Publishing docker image to docker hub")
                 Docker.login(dockerUsername, dockerPassword)
-                // copy the multi-platform manifest from local registry to Docker Hub without rebuilding
-                Docker.exec("buildx", "imagetools", "create", "-t", kannichImage, localImage)
+
+                // imagetools create copies OCI-format blobs as-is, but Docker Hub rejects OCI config blobs (400).
+                // skopeo converts to Docker schema2 on the fly during the cross-registry copy.
+                suspend fun skopeoCopy(dest: String) {
+                    Docker.exec(
+                        "run", "--rm", "--net=host",
+                        "-v", "/root/.docker/config.json:/tmp/auth.json:ro",
+                        "quay.io/skopeo/stable@sha256:5ece005de716d48ae6097afbdcd09c0fa19967623263aa4a16c19ceb8580191f",
+                        "copy", "--all",
+                        "--authfile", "/tmp/auth.json",
+                        "--src-tls-verify=false",
+                        "docker://$localImage", "docker://$dest"
+                    )
+                }
+
+                skopeoCopy(kannichImage)
                 if (setLatest) {
                     log("Setting latest tag")
-                    Docker.exec("buildx", "imagetools", "create", "-t", "$imageBaseName:latest", localImage)
+                    skopeoCopy("$imageBaseName:latest")
                 }
 
                 log("Publishing to Maven Central")
