@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-05-15
+### Added
+- New `Arch` class for detecting the current CPU architecture (`Arch.current` returns `Arch.Amd64`, `Arch.Arm64`, or `Arch.Unknown`).
+
+### Changed
+- `Kannich.CacheDir` and `Kannich.WorkspaceDir` are now dynamic properties that read from the `KANNICH_CACHE_DIR` and `KANNICH_PROJECT_DIR` environment variables (falling back to `/kannich/cache` and `/workspace` respectively).
+
+### Breaking Change
+- The constants `Kannich.CACHE_DIR`, `Kannich.WORKSPACE_DIR`, `Kannich.LAYER_DIR`, and `Kannich.DEV_REPO_DIR` have been removed. Use `Kannich.CacheDir` and `Kannich.WorkspaceDir` instead.
+
 ## [0.9.0] - 2026-03-20
 ### Changed
 - Bumped the `kannich-parent` dependency to `0.9.0`.

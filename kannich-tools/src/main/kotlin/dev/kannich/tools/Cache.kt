@@ -1,6 +1,5 @@
 package dev.kannich.tools
 
-import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.Kannich
 
 /**
@@ -30,12 +29,6 @@ object Cache {
     suspend fun path(key: String): String {
         return "${Kannich.CacheDir}/$key"
     }
-
-    /**
-     * Utility method for constructing a cache key from tool, architecture, and version. Used by most
-     * kannich tools to build up their caching structures.
-     */
-    fun key(tool:String,version:String,arch:String = Arch.current.archString): String = "tools/${tool}/${arch}/${version}"
 
     /**
      * Gets the base cache directory path.
