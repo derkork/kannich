@@ -27,7 +27,7 @@ jobs:
       - name: Run smoke test
         run: ./kannichw smoke-test
         env:
-          KANNICH_IMAGE: derkork/kannich@sha256:0f2b3814b8aa71eb1acfefe445a08f73ed415209e34648d561b47c974f7069d7
+          KANNICH_IMAGE: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
 
       - name: Fix cache permissions
         run: sudo chown -R $USER $KANNICH_CACHE_DIR

@@ -247,4 +247,11 @@ pipeline {
             }
         }
     }
+
+    execution("smoke-test") {
+        job {
+            log("Hello from Kannich!")
+            Shell.exec("ls", "-la")
+        }
+    }
 }
