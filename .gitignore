@@ -44,3 +44,4 @@ test_*.ps1
 *.key
 release.sh
 trivy-docker-results.html
+.claude
