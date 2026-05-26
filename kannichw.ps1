@@ -26,7 +26,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$null = docker info 2>&1
+try { docker info | Out-Null } catch {}
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Error: Docker daemon not running. Please start Docker."
     exit 1
@@ -54,7 +54,7 @@ if ($env:KANNICH_CACHE_DIR) {
     $CacheMount = "$env:KANNICH_CACHE_DIR`:/kannich/cache"
 } else {
     # the default cache is a docker volume
-    $null = docker volume inspect kannich-cache 2>&1
+    try { docker volume inspect kannich-cache | Out-Null } catch {}
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Creating docker volume: kannich-cache"
         docker volume create kannich-cache | Out-Null
