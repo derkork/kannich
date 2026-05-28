@@ -13,22 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set cache directory
-        run: echo "KANNICH_CACHE_DIR=$HOME/.kannich-cache" >> $GITHUB_ENV
-
-      - name: Cache Kannich dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: derkork/kannich-action@302322e072715e74738f589ead3c167a5735ae35 #v1
         with:
-          path: ${{ env.KANNICH_CACHE_DIR }}
-          key: kannich-${{ runner.os }}-${{ hashFiles('.kannichfile.main.kts') }}
-          restore-keys: |
-            kannich-${{ runner.os }}-
-
-      - name: Run smoke test
-        run: ./kannichw smoke-test
-        env:
-          KANNICH_IMAGE: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
-
-      - name: Fix cache permissions
-        run: sudo chown -R $USER $KANNICH_CACHE_DIR
-        if: always()
+          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          executions: smoke-test
