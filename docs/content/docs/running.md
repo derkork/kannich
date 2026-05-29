@@ -31,6 +31,40 @@ Running Kannich in CI is pretty much the same as running locally. You will need 
 ### CI system flavors
 There are two main flavors of CI systems - systems that run CI executions in containers (e.g. GitLab, CircleCI, Woodpecker CI) and systems that run CI executions in VMs (e.g. GitHub Actions, Bitbucket Pipelines, TravisCI). There are also systems that allow both (Jenkins, TeamCity). In general, you could use the wrapper scripts everywhere. However, on container native systems it can be worthwile using the Kannich image directly without going through the wrapper as this avoids firing up a second docker container to run the wrapper.
 
+### GitHub Actions
+
+The easiest way to run Kannich on GitHub Actions is to use the [kannich-action](https://github.com/derkork/kannich-action). It handles cache setup, permissions and running your executions in one step.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # always pin actions to a SHA hash to mitigate against supply chain attacks
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c # v1
+        with:
+          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          executions: |
+            build
+            test
+```
+
+You can pass additional environment variables to Kannich using the `env` input:
+
+```yaml
+      - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c # v1
+        with:
+          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          executions: build
+          env: |
+            SOME_VARIABLE=some-value
+            SOME_SECRET=${{ secrets.MY_SECRET }}
+```
+
+See the [kannich-action README](https://github.com/derkork/kannich-action) for a full list of inputs.
+
 ### GitLab CI
 
 Here is an example of how to run Kannich in GitLab CI:
