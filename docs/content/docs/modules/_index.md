@@ -1,7 +1,15 @@
 +++
-title = "Module Versions"
-weight = 1
+title = "Modules"
+weight = 3
+sort_by = "weight"
+template = "section.html"
 +++
+
+Kannich is built around a set of modules, each providing support for a specific tool or technology. You pull in exactly the modules you need by declaring them as dependencies at the top of your `.kannichfile.main.kts`.
+
+Each module page covers what the module provides, how to add it to your pipeline, and any configuration options it supports.
+
+## Module Versions
 
 Current versions of all available Kannich modules.
 
@@ -21,4 +29,3 @@ Current versions of all available Kannich modules.
 | `kannich-tools` | {{ version(module="kannich-tools") }} | Base classes for tool plugins |
 | `kannich-trivy` | {{ version(module="kannich-trivy") }} | Trivy security scanner integration |
 | `kannich-uv` | {{ version(module="kannich-uv") }} | UV Python package manager |
-

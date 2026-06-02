@@ -18,7 +18,7 @@ All Kannich pipelines live in a file called `.kannichfile.main.kts` in the root 
 @file:DependsOn("dev.kannich:kannich-maven:{{ version(module="kannich-maven") }}")
 ```
 
-You can always find the latest version of every module on the [Module Versions](../../reference/module-versions/) page.
+You can always find the latest version of every module on the [Module Versions](@/docs/modules/_index.md) page.
 
 Then come the imports and the `pipeline { }` block, which is the outermost container for everything:
 
