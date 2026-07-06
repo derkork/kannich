@@ -17,6 +17,7 @@ Current versions of all available Kannich modules.
 |--------|---------|-------------|
 | `kannich-aws-cli` | {{ version(module="kannich-aws-cli") }} | AWS CLI tool support |
 | `kannich-gcloud-cli` | {{ version(module="kannich-gcloud-cli") }} | Google Cloud CLI tool support |
+| `kannich-ggg` | {{ version(module="kannich-ggg") }} | GGG Godot version and addon management |
 | `kannich-helm` | {{ version(module="kannich-helm") }} | Helm chart management |
 | `kannich-java` | {{ version(module="kannich-java") }} | Java SDK management and execution |
 | `kannich-maven` | {{ version(module="kannich-maven") }} | Maven build tool support |

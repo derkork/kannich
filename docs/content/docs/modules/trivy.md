@@ -1,6 +1,6 @@
 +++
 title = "Trivy"
-weight = 10
+weight = 11
 +++
 
 ## Overview

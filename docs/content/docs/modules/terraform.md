@@ -1,6 +1,6 @@
 +++
 title = "Terraform"
-weight = 9
+weight = 10
 +++
 
 ## Overview

@@ -1,6 +1,6 @@
 +++
 title = "pre-commit"
-weight = 7
+weight = 8
 +++
 
 ## Overview

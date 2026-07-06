@@ -1,6 +1,6 @@
 +++
 title = "Quarkus"
-weight = 8
+weight = 9
 +++
 
 > **Experimental:** This module is in an early state and may change significantly or be removed in a future release. Use it with that in mind.
