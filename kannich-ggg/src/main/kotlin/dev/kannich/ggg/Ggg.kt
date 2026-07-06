@@ -1,4 +1,4 @@
-package dev.kannich.godot
+package dev.kannich.ggg
 
 import dev.kannich.stdlib.Arch
 import dev.kannich.stdlib.ExecResult

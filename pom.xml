@@ -32,7 +32,7 @@
         <module>kannich-gcloud-cli</module>
         <module>kannich-uv</module>
         <module>kannich-node</module>
-        <module>kannich-godot</module>
+        <module>kannich-ggg</module>
     </modules>
 
     <licenses>

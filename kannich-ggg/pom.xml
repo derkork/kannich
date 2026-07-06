@@ -11,10 +11,10 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>kannich-godot</artifactId>
+    <artifactId>kannich-ggg</artifactId>
     <version>0.1.0</version>
-    <name>Kannich Godot Plugin</name>
-    <description>Godot plugin for Kannich</description>
+    <name>Kannich GGG Plugin</name>
+    <description>GGG (Godot Goodie Grabber) plugin for Kannich</description>
 
     <dependencyManagement>
         <dependencies>

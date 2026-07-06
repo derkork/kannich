@@ -239,7 +239,19 @@ mvn install -DskipTests && mvn verify -Pintegration-tests -Dsurefire.skip=true
 
 # All tests (unit + integration, requires all modules to be installed first)
 mvn install -DskipTests && mvn verify -Pintegration-tests
+
+# Integration tests for a single module only (does not build the other modules)
+mvn install -DskipTests -pl kannich-ggg -am
+mvn -N -Pintegration-tests verify -Dinclude=kannich-ggg
 ```
+
+The single-module variant works because `-pl <module> -am` prunes the reactor down to
+just that module and the modules it actually depends on. The `.tests.main.kts` scripts
+don't consume reactor build output directly, they resolve jars via `@file:DependsOn`
+from your local Maven repository, which is why the first command needs to `install`.
+The test runner itself is bound to the root `kannich-parent` pom, so `mvn -N` (non-recursive)
+builds nothing and just triggers it directly; `-Dinclude` then filters it down to the one
+module's test.
 
 ### Working with Documentation
 
