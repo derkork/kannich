@@ -24,7 +24,8 @@ import dev.kannich.tools.Git
 suspend fun Maven.quarkusNativeBuild(
     name: String = "output",
     tag: String = "latest",
-    labels: Map<String, String> = emptyMap()
+    labels: Map<String, String> = emptyMap(),
+    profile: String? = null
 ) {
     val additionalParams = mutableListOf<String>()
 
@@ -42,6 +43,10 @@ suspend fun Maven.quarkusNativeBuild(
     additionalParams.addParam("https.nonProxyHosts")
     additionalParams.addParam("https.proxyUser")
     additionalParams.addParam("https.proxyPassword")
+
+    if (profile != null) {
+        additionalParams.add("-Dquarkus.profile=$profile")
+    }
 
     labels.forEach { (key, value) -> additionalParams.add("-Dquarkus.container-image.labels.$key=$value") }
 
