@@ -26,6 +26,7 @@
         <module>kannich-quarkus</module>
         <module>kannich-trivy</module>
         <module>kannich-terraform</module>
+        <module>kannich-pulumi</module>
         <module>kannich-pre-commit</module>
         <module>kannich-helm</module>
         <module>kannich-aws-cli</module>
