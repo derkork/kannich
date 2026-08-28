@@ -77,7 +77,7 @@ pipeline {
         }
     }
 
-    execution("release", "Releases Kannich to Docker Hub and Maven Central") {
+    execution("release", "Releases Kannich to Docker Hub") {
         job {
             val dockerUsername = requireEnv("KANNICH_DOCKER_USERNAME")
             val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
@@ -143,11 +143,6 @@ pipeline {
                 if (setLatest) {
                     log("Setting latest tag")
                     skopeoCopy("$imageBaseName:latest")
-                }
-
-                log("Publishing to Maven Central")
-                withEnv(mapOf("MAVEN_GPG_PASSPHRASE" to gpgPassphrase)) {
-                    maven.exec("-B", "-Prelease", "deploy", "-DskipTests")
                 }
             } else {
                 log("Dry run: not pushing.")
