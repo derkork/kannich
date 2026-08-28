@@ -43,6 +43,7 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-stdlib</artifactId>
+            <version>0.10.1</version>
             <!-- for the CLI this is scope "compile" as it gets baked into the image -->
             <scope>compile</scope>
         </dependency>
