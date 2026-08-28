@@ -5,6 +5,7 @@ import dev.kannich.stdlib.ExecResult
 import dev.kannich.stdlib.JobContext
 import dev.kannich.stdlib.fail
 import dev.kannich.tools.ArchiveToolInstaller
+import dev.kannich.tools.Cache
 import dev.kannich.tools.Fs
 import dev.kannich.tools.Shell
 
@@ -24,6 +25,7 @@ import dev.kannich.tools.Shell
  */
 class Node(version: String) : ArchiveToolInstaller("node", version, archiveStripComponents = 1, archiveFormat = ".tar.xz") {
 
+    val NpmCachePath = "tools/$name/npm-cache"
     val npm = SubTool(this, "npm")
     val npx = SubTool(this, "npx")
 
@@ -38,6 +40,15 @@ class Node(version: String) : ArchiveToolInstaller("node", version, archiveStrip
         // ensure npx and npm are marked executable
         Fs.chmod(getInstallPath() + "/bin/npx", "755")
         Fs.chmod(getInstallPath() + "/bin/npm", "755")
+        // ensure npm global cache is stored in kannich cache
+
+        Cache.ensureDir(NpmCachePath)
+        val cachePath = Cache.path(NpmCachePath)
+        // we need to call this through the shell as we're still in setup phase and using
+        // the sub-tool would result in an endless recursion.
+        JobContext.current().withEnv("PATH" to getInstallPath() + "/bin") {
+            Shell.exec(getInstallPath() + "/bin/npm", "config", "set", "cache", cachePath, "--global", silent = true)
+        }
     }
 
     override fun getDownloadUrl(): String {
