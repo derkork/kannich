@@ -294,9 +294,9 @@ object FsUtil {
 
                 Files.walk(searchPath, walkMaxDepth).use { stream ->
                     stream.forEach { file ->
-                        if (Files.isSameFile(file, rootPath)) return@forEach
-
                         try {
+                            if (Files.isSameFile(file, rootPath)) return@forEach
+
                             val relativePath = rootPath.relativize(file).toUnixString()
                             if (relativePath.isEmpty()) return@forEach
 

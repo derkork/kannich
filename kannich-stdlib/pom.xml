@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-stdlib</artifactId>
-    <version>0.10.0</version>
+    <version>0.10.1</version>
     <name>Kannich Standard Library</name>
     <description>Standard library DSL for Kannich pipelines (pipeline, job, execution)</description>
 
