@@ -131,7 +131,7 @@ pipeline {
                     Docker.exec(
                         "run", "--rm", "--net=host",
                         "-v", "/root/.docker/config.json:/tmp/auth.json:ro",
-                        "quay.io/skopeo/stable@sha256:5ece005de716d48ae6097afbdcd09c0fa19967623263aa4a16c19ceb8580191f",
+                        "quay.io/skopeo/stable:v1.22.2-immutable",
                         "copy", "--all",
                         "--authfile", "/tmp/auth.json",
                         "--src-tls-verify=false",

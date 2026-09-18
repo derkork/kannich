@@ -132,19 +132,31 @@ Kannich is implemented in Kotlin and is built with the Maven build system. If it
 
 ```
 kannich/
-├── kannich-core/           # Core executor engine
+├── kannich-bom/            # Bill of materials, pins versions across modules
+├── kannich-runtime/        # Core executor engine
 │   └── src/main/kotlin/dev/kannich/core/
-│       ├── docker/         # Docker client, container management, overlay FS
 │       ├── dsl/            # Kotlin script host and DSL definitions
 │       ├── execution/      # Job orchestration (sequential/parallel)
-│       ├── cache/          # Tool and dependency caching
-│       ├── artifact/       # Build artifact collection
-│       └── plugin/         # Plugin system interfaces
-├── kannich-stdlib/         # Standard library DSL (pipeline, job, execution)
+│       └── proxy/          # Proxying for the sandboxed script environment
+├── kannich-stdlib/         # Standard library DSL (pipeline, job, execution, artifacts)
+├── kannich-tools/          # Shared tool infrastructure used by module plugins
 ├── kannich-cli/            # Command-line interface
-├── kannich-jvm/            # JVM plugin (Java/Kotlin SDK management)
+├── kannich-test/           # Test harness/utilities shared by module plugins
+├── kannich-java/           # Java plugin (JDK management)
 ├── kannich-maven/          # Maven plugin
-├── kannich-docker/         # Docker-in-Docker plugin
+├── kannich-quarkus/        # Quarkus plugin
+├── kannich-trivy/          # Trivy plugin
+├── kannich-terraform/      # Terraform plugin
+├── kannich-pulumi/         # Pulumi plugin
+├── kannich-pre-commit/     # pre-commit plugin
+├── kannich-helm/           # Helm plugin
+├── kannich-aws-cli/        # AWS CLI plugin
+├── kannich-gcloud-cli/     # Google Cloud CLI plugin
+├── kannich-uv/             # uv (Python) plugin
+├── kannich-node/           # Node.js plugin
+├── kannich-ggg/            # Godot Goodie Grabber plugin
+├── kannich-sops/           # SOPS plugin
+├── kannich-age/            # age plugin
 ├── kannich-builder-image/  # Custom builder Docker image
 ├── kannichw                # End-user wrapper (Unix) - committed with user projects
 ├── kannichw.ps1            # End-user wrapper (Windows)
@@ -156,27 +168,20 @@ kannich/
 graph TD
     stdlib[kannich-stdlib]
     tools[kannich-tools]
-    core[kannich-core]
+    runtime[kannich-runtime]
     cli[kannich-cli]
     test[kannich-test]
-    java[kannich-java]
-    maven[kannich-maven]
-    trivy[kannich-trivy]
-    helm[kannich-helm]
+    modules["module plugins (kannich-java, kannich-maven, kannich-sops, kannich-age, ...)"]
 
     tools --> stdlib
-    core --> stdlib
-    cli --> core
+    runtime --> stdlib
+    cli --> runtime
     cli --> stdlib
-    java --> tools
-    maven --> tools
-    maven --> java
-    trivy --> tools
-    helm --> tools
+    cli --> tools
+    modules --> tools
 
     tools -.-> test
-    java -.-> test
-    maven -.-> test
+    modules -.-> test
 ```
 
 **Legend:**

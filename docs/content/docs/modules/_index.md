@@ -15,6 +15,7 @@ Current versions of all available Kannich modules.
 
 | Module | Version | Description |
 |--------|---------|-------------|
+| `kannich-age` | {{ version(module="kannich-age") }} | age file encryption tool |
 | `kannich-aws-cli` | {{ version(module="kannich-aws-cli") }} | AWS CLI tool support |
 | `kannich-gcloud-cli` | {{ version(module="kannich-gcloud-cli") }} | Google Cloud CLI tool support |
 | `kannich-ggg` | {{ version(module="kannich-ggg") }} | GGG Godot version and addon management |
@@ -24,6 +25,7 @@ Current versions of all available Kannich modules.
 | `kannich-node` | {{ version(module="kannich-node") }} | Node.js runtime management |
 | `kannich-pre-commit` | {{ version(module="kannich-pre-commit") }} | Pre-commit hooks framework |
 | `kannich-quarkus` | {{ version(module="kannich-quarkus") }} | Quarkus framework support |
+| `kannich-sops` | {{ version(module="kannich-sops") }} | SOPS secrets encryption tool |
 | `kannich-stdlib` | {{ version(module="kannich-stdlib") }} | Core standard library with pipeline DSL |
 | `kannich-terraform` | {{ version(module="kannich-terraform") }} | Terraform infrastructure management |
 | `kannich-test` | {{ version(module="kannich-test") }} | Testing utilities and helpers |

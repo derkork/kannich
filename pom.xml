@@ -34,6 +34,8 @@
         <module>kannich-uv</module>
         <module>kannich-node</module>
         <module>kannich-ggg</module>
+        <module>kannich-sops</module>
+        <module>kannich-age</module>
     </modules>
 
     <licenses>
