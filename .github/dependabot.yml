@@ -1,0 +1,13 @@
+# Only GitHub Actions are kept up to date automatically. They are used in CI
+# only and never end up in released artifacts. Maven dependencies are updated
+# deliberately; security fixes arrive via Dependabot security updates.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
