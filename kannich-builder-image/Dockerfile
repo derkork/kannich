@@ -12,7 +12,7 @@ RUN jlink \
     --output /jdk-minimal
 
 # Stage 2: Final image
-FROM cruizba/ubuntu-dind:noble-29.1.3
+FROM cruizba/ubuntu-dind:noble-29.8.2@sha256:1eb5561043a7a3b191890f7fe3bb1bcadc3216e7f39e8b6fd88cc8302781ef88
 
 LABEL org.opencontainers.image.title="Kannich Builder"
 LABEL org.opencontainers.image.description="Base image for Kannich CI builds"
@@ -44,6 +44,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     yq \
     # Network tools
     netcat-openbsd \
+    # The base image ships buildx and compose twice. The apt packages are shadowed
+    # by the copies in /usr/local and the model plugin is unused, so drop them to
+    # reduce the attack surface.
+    && apt-get purge -y docker-buildx-plugin docker-compose-plugin docker-model-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy minimal JDK from builder stage (not in global PATH)

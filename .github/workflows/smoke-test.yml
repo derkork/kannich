@@ -18,5 +18,5 @@ jobs:
 
       - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c #v1
         with:
-          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          image: derkork/kannich@sha256:7a2d1515c319af986d5b641ba39b4891d46d786bd8dbfbe2a9ea1e65cdfb08d2 # 0.12.1-0.10.1
           executions: smoke-test

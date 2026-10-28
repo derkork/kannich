@@ -15,7 +15,7 @@ Add the module to your `.kannichfile.main.kts`:
 @file:DependsOn("dev.kannich:kannich-ggg:{{ version(module="kannich-ggg") }}")
 ```
 
-You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page.
+You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page. The {{ changelog(module="kannich-ggg") }} lists what changed in each version.
 
 ## Basic Usage
 

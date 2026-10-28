@@ -13,7 +13,7 @@ Add the module to your `.kannichfile.main.kts`:
 @file:DependsOn("dev.kannich:kannich-node:{{ version(module="kannich-node") }}")
 ```
 
-You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page.
+You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page. The {{ changelog(module="kannich-node") }} lists what changed in each version.
 
 ## Basic Usage
 

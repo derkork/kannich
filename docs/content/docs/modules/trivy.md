@@ -13,7 +13,7 @@ Add the module to your `.kannichfile.main.kts`:
 @file:DependsOn("dev.kannich:kannich-trivy:{{ version(module="kannich-trivy") }}")
 ```
 
-You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page.
+You can always find the latest version on the [Module Versions](@/docs/modules/_index.md) page. The {{ changelog(module="kannich-trivy") }} lists what changed in each version.
 
 ## Scanning Dependencies
 

@@ -1,0 +1,33 @@
+name: Image Scan
+
+# The release pipeline scans the image before publishing. This re-scans the
+# published image regularly, so vulnerabilities disclosed after a release show
+# up under Security -> Code scanning.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c #v1
+        with:
+          image: derkork/kannich@sha256:7a2d1515c319af986d5b641ba39b4891d46d786bd8dbfbe2a9ea1e65cdfb08d2 # 0.12.1-0.10.1
+          executions: image-scan
+
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-image-results.sarif
+          category: trivy-image

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>kannich-cli</artifactId>
+    <version>0.10.1</version>
     <name>Kannich CLI</name>
     <description>Command-line interface for Kannich</description>
 
@@ -23,6 +24,18 @@
                 <version>0.10.0</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- maven-core (via kannich-runtime) pulls in vulnerable versions of these. Must be
+                 repeated here, because dependencyManagement of kannich-runtime does not apply to us. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.plexus</groupId>
+                <artifactId>plexus-utils</artifactId>
+                <version>3.6.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -38,7 +51,7 @@
         <dependency>
             <groupId>dev.kannich</groupId>
             <artifactId>kannich-runtime</artifactId>
-            <version>0.10.0</version>
+            <version>0.10.1</version>
         </dependency>
         <dependency>
             <groupId>dev.kannich</groupId>

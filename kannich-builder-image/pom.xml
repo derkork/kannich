@@ -7,14 +7,14 @@
     <groupId>dev.kannich</groupId>
     <artifactId>kannich-builder-image</artifactId>
     <!-- Image Version - Kannich-Version -->
-    <version>0.12.0-${kannich.version}</version>
+    <version>0.12.1-${kannich.version}</version>
     <packaging>pom</packaging>
 
     <name>Kannich Builder Image</name>
     <description>Docker image for running Kannich pipelines</description>
 
     <properties>
-        <kannich.version>0.10.0</kannich.version>
+        <kannich.version>0.10.1</kannich.version>
     </properties>
 
     <build>

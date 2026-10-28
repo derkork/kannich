@@ -45,7 +45,7 @@ jobs:
 
       - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c # v1
         with:
-          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          image: derkork/kannich@sha256:7a2d1515c319af986d5b641ba39b4891d46d786bd8dbfbe2a9ea1e65cdfb08d2 # 0.12.1-0.10.1
           executions: |
             build
             test
@@ -56,7 +56,7 @@ You can pass additional environment variables to Kannich using the `env` input:
 ```yaml
       - uses: derkork/kannich-action@4d9359ec7acdedefb1a1742492673f1b7997dd5c # v1
         with:
-          image: derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e # 0.11.0-0.10.0
+          image: derkork/kannich@sha256:7a2d1515c319af986d5b641ba39b4891d46d786bd8dbfbe2a9ea1e65cdfb08d2 # 0.12.1-0.10.1
           executions: build
           env: |
             SOME_VARIABLE=some-value
@@ -76,13 +76,13 @@ Here is an example of how to run Kannich in GitLab CI:
 # and prevents issues with Docker Hub rate limits.
 image: 
   # Recommended way: use the dependency proxy + @sha256:...
-  name: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/derkork/kannich@sha256:a23067a63c1943b4f24a96bf9841279c2895ce97cc7565133773f6814ae8281e
+  name: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/derkork/kannich@sha256:7a2d1515c319af986d5b641ba39b4891d46d786bd8dbfbe2a9ea1e65cdfb08d2 # 0.12.1-0.10.1
   
   # You can also use a tag:
-  # name: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/derkork/kannich:0.11.0-0.10.0
+  # name: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/derkork/kannich:{{ version(module="kannich-builder-image") }}
   
   # If you don't want to use the dependency proxy, you can use this instead (works also with @sha256:...):
-  # name: derkork/kannich:0.11.0-0.10.0
+  # name: derkork/kannich:{{ version(module="kannich-builder-image") }}
   
   # This disables Kannich's default entrypoint - it is necessary, so GitLab can do its own things before Kannich starts.
   entrypoint: [""]

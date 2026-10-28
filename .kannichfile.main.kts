@@ -82,7 +82,6 @@ pipeline {
             val dockerUsername = requireEnv("KANNICH_DOCKER_USERNAME")
             val dockerPassword = secret(requireEnv("KANNICH_DOCKER_PASSWORD"))
             val gpgKey = requireEnv("KANNICH_GPG_KEY")
-            val gpgPassphrase = secret(requireEnv("KANNICH_GPG_PASSPHRASE"))
             val setLatest = getEnvFlag("KANNICH_SET_LATEST") ?: true
             val dryRun = getEnvFlag("KANNICH_DRY_RUN") ?: false
 
@@ -152,20 +151,32 @@ pipeline {
 
     execution("dependency-check", "Verifies dependencies have no vulnerabilities") {
         job {
+            // Trivy only sees direct dependencies when reading a pom.xml, so let Maven resolve
+            // the full runtime dependency tree of each module and scan the resulting jars.
+            val maven = Maven("3.9.6", java)
+            maven.exec(
+                "-B", "-q", "package", "dependency:copy-dependencies",
+                "-DincludeScope=runtime",
+                "-DoutputDirectory=target/scanned-dependencies",
+                "-DskipTests"
+            )
+
             val poms = Fs.glob("*/pom.xml")
             val home = trivy.home()
 
             val failures = poms.mapNotNull {
                 val path = it.substringBeforeLast("/pom.xml")
                 cd (path) {
-                    Fs.mkdir("target")
+                    if (!Fs.exists("target/scanned-dependencies")) {
+                        return@cd null
+                    }
                     val success = allowFailure {
                         trivy.exec(
-                            "fs",
+                            "rootfs",
                             "--quiet",
                             "--scanners",
                             "vuln",
-                            ".",
+                            "target/scanned-dependencies",
                             "--severity", "CRITICAL,HIGH",
                             "--ignore-unfixed",
                             "--exit-code", "1",
@@ -187,6 +198,25 @@ pipeline {
             if(failures.isNotEmpty()) {
                 fail("Vulnerabilities found in dependencies: ${failures.joinToString(", ")}")
             }
+        }
+    }
+
+    execution("image-scan", "Scans the published docker image for vulnerabilities") {
+        job {
+            // results are uploaded to GitHub code scanning, so findings don't fail the job
+            artifacts(On.SUCCESS_OR_FAILURE) {
+                includes("trivy-image-results.sarif")
+            }
+
+            trivy.exec(
+                "image",
+                "derkork/kannich:latest",
+                "--severity", "HIGH,CRITICAL",
+                "--ignore-unfixed",
+                "--no-progress",
+                "--format", "sarif",
+                "-o", "trivy-image-results.sarif"
+            )
         }
     }
 
@@ -230,12 +260,33 @@ pipeline {
     execution("update-docs-versions", "Extracts module versions and updates documentation") {
         job {
             val maven = Maven("3.9.6", java)
-            val versions = collectModuleVersions(maven)
+            val versions = collectModuleVersions(maven).mapKeys { it.key.substringAfterLast(":") }.toMutableMap()
+
+            // the builder image is only part of the bootstrap profile, so it isn't collected above
+            versions["kannich-builder-image"] = cd("kannich-builder-image") {
+                maven.getProjectVersion()
+            }
 
             // Generate JSON file for documentation
-            val json = "{${versions.entries.toList().sortedBy { it.key }.joinToString { "\"${it.key.substringAfterLast(":")}\": \"${it.value}\"" }}}"
+            val json = "{${versions.entries.toList().sortedBy { it.key }.joinToString { "\"${it.key}\": \"${it.value}\"" }}}"
 
             Fs.write("docs/static/versions.json", json)
+
+            // every published module needs a changelog and a row in the module versions table
+            val modulesPage = Fs.readAsString("docs/content/docs/modules/_index.md")
+            val problems = versions.keys
+                .filter { it != "kannich-parent" && it != "kannich-bom" }
+                .sorted()
+                .flatMap { module ->
+                    listOfNotNull(
+                        if (!Fs.exists("$module/CHANGES.md")) "$module has no CHANGES.md" else null,
+                        if (!modulesPage.contains("version(module=\"$module\")")) "$module is missing from docs/content/docs/modules/_index.md" else null
+                    )
+                }
+
+            if (problems.isNotEmpty()) {
+                fail("Documentation is incomplete:\n${problems.joinToString("\n") { "- $it" }}")
+            }
 
             artifacts {
                 includes("docs/static/versions.json")

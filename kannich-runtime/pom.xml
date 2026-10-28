@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>kannich-runtime</artifactId>
-    <version>0.10.0</version>
+    <version>0.10.1</version>
     <name>Kannich Runtime</name>
     <description>Executor runtime for Kannich CI pipelines</description>
 
@@ -28,6 +28,17 @@
                 <version>0.10.0</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- maven-core (via kotlin-scripting-dependencies-maven) pulls in vulnerable versions of these -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.plexus</groupId>
+                <artifactId>plexus-utils</artifactId>
+                <version>3.6.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
