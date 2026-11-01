@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Zola
-        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2
         with:
           tool: zola@0.22.1
 
